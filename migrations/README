@@ -1,0 +1,2 @@
+Alembic migrations for SupportPilot. Schema changes must be represented here; the application never creates tables at startup.
+

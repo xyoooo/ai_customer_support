@@ -1,0 +1,71 @@
+name: supportpilot
+
+services:
+  db:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_DB: supportpilot
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: local_postgres_password
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./infra/postgres/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d supportpilot"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+  migrate:
+    build:
+      context: .
+      dockerfile: infra/docker/api.Dockerfile
+      target: runtime
+    environment:
+      SUPPORTPILOT_MIGRATION_DATABASE_URL: postgresql+psycopg://supportpilot_migrator:local_migrator_password@db:5432/supportpilot
+    command: ["alembic", "upgrade", "head"]
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: "no"
+
+  api:
+    build:
+      context: .
+      dockerfile: infra/docker/api.Dockerfile
+      target: runtime
+    environment:
+      SUPPORTPILOT_ENVIRONMENT: development
+      SUPPORTPILOT_DATABASE_URL: postgresql+asyncpg://supportpilot_app:local_app_password@db:5432/supportpilot
+      SUPPORTPILOT_JWT_SECRET: local-development-secret-change-before-deployment
+      SUPPORTPILOT_ALLOWED_ORIGINS: '["http://localhost:5173"]'
+      SUPPORTPILOT_SECURE_COOKIES: "false"
+    command: ["uvicorn", "apps.api.main:app", "--host", "0.0.0.0", "--port", "8000"]
+    ports:
+      - "8000:8000"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health/ready')"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  web:
+    build:
+      context: .
+      dockerfile: infra/docker/web.Dockerfile
+      target: development
+    environment:
+      VITE_API_URL: http://localhost:8000/api/v1
+    ports:
+      - "5173:5173"
+    depends_on:
+      api:
+        condition: service_healthy
+
+volumes:
+  postgres_data:

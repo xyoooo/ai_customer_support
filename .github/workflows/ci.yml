@@ -1,0 +1,92 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v7
+        with:
+          version: "0.11.28"
+          enable-cache: true
+      - run: uv python install 3.12
+      - run: uv sync --frozen --all-groups
+      - run: docker compose up -d db
+      - name: Wait for PostgreSQL
+        run: |
+          for attempt in {1..30}; do
+            if docker compose exec -T db pg_isready -U postgres -d supportpilot_test; then exit 0; fi
+            sleep 2
+          done
+          docker compose logs db
+          exit 1
+      - run: uv run ruff check .
+      - run: uv run ruff format --check .
+      - run: uv run mypy apps packages
+      - run: uv run pytest --cov=apps --cov=packages --cov-report=term --cov-report=xml
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: backend-coverage
+          path: coverage.xml
+
+  frontend:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: apps/web
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: apps/web/package-lock.json
+      - run: npm ci
+      - run: npm run check
+      - run: npm audit --audit-level=high
+
+  containers:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    needs: [backend, frontend]
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker compose build api web
+
+  end-to-end:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    needs: [backend, frontend]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: apps/web/package-lock.json
+      - run: npm ci
+        working-directory: apps/web
+      - run: npx playwright install --with-deps chromium
+        working-directory: apps/web
+      - run: docker compose up -d --build
+      - name: Wait for the web application
+        run: |
+          for attempt in {1..60}; do
+            if curl --fail --silent http://localhost:5173 >/dev/null; then exit 0; fi
+            sleep 2
+          done
+          docker compose logs
+          exit 1
+      - run: npm run test:e2e
+        working-directory: apps/web
