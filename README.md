@@ -27,6 +27,7 @@ uv run pytest
 Set-Location apps/web
 npm.cmd ci
 npm.cmd run check
+npm.cmd run check:api
 ```
 
 No AI provider or document-processing dependency is included yet. Those adapters will be added behind stable domain interfaces in later milestones.
@@ -34,3 +35,5 @@ No AI provider or document-processing dependency is included yet. Those adapters
 ## Development report
 
 See the [Week 1 development report](docs/week-1-development-report.md) for delivered scope, engineering rationale, test outcomes, known limitations, and prioritized next improvements.
+
+The accepted [document lifecycle and durable-job ADR](docs/adr/0004-document-lifecycle-and-durable-jobs.md) defines the stable boundary for Week 2 implementation.

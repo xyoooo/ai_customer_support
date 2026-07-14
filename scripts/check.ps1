@@ -13,6 +13,8 @@ Push-Location "$PSScriptRoot\..\apps\web"
 try {
     & npm.cmd run check
     if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+    & npm.cmd run check:api
+    if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 }
 finally {
     Pop-Location
