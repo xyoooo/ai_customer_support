@@ -42,8 +42,11 @@ def test_expired_access_token_is_rejected(settings: Settings) -> None:
 
 def test_tampered_access_token_is_rejected(settings: Settings) -> None:
     token = create_access_token(uuid4(), settings)
+    header, payload, signature = token.split(".")
+    replacement = "A" if signature[0] != "A" else "B"
+    tampered_token = f"{header}.{payload}.{replacement}{signature[1:]}"
     with pytest.raises(TokenError):
-        decode_access_token(f"{token[:-1]}x", settings)
+        decode_access_token(tampered_token, settings)
 
 
 def test_refresh_token_round_trip() -> None:
