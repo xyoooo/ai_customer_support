@@ -40,12 +40,14 @@ def clean_database(request: pytest.FixtureRequest) -> Iterator[None]:
     request.getfixturevalue("migrated_database")
     with psycopg.connect(MIGRATION_URL, autocommit=True) as connection:
         connection.execute(
-            "TRUNCATE TABLE refresh_sessions, workspace_memberships, workspaces, users CASCADE"
+            "TRUNCATE TABLE jobs, document_versions, documents, refresh_sessions, "
+            "workspace_memberships, workspaces, users CASCADE"
         )
     yield
     with psycopg.connect(MIGRATION_URL, autocommit=True) as connection:
         connection.execute(
-            "TRUNCATE TABLE refresh_sessions, workspace_memberships, workspaces, users CASCADE"
+            "TRUNCATE TABLE jobs, document_versions, documents, refresh_sessions, "
+            "workspace_memberships, workspaces, users CASCADE"
         )
 
 

@@ -3,7 +3,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
 
-from packages.domain.enums import WorkspaceRole
+from packages.domain.enums import DocumentVersionStatus, JobState, JobType, WorkspaceRole
 
 
 class RegisterRequest(BaseModel):
@@ -91,6 +91,72 @@ class MembershipResponse(BaseModel):
     display_name: str
     role: WorkspaceRole
     created_at: datetime
+
+
+class DocumentUpdate(BaseModel):
+    display_name: str = Field(min_length=1, max_length=255)
+
+    @field_validator("display_name")
+    @classmethod
+    def strip_display_name(cls, value: str) -> str:
+        return value.strip()
+
+
+class DocumentVersionResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    document_id: UUID
+    version_number: int
+    original_filename: str
+    media_type: str
+    byte_size: int
+    sha256: str
+    status: DocumentVersionStatus
+    created_by: UUID
+    created_at: datetime
+    updated_at: datetime
+
+
+class JobResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    job_type: JobType
+    state: JobState
+    attempt_count: int
+    max_attempts: int
+    available_at: datetime
+    lease_expires_at: datetime | None
+    error_code: str | None
+    error_message: str | None
+    created_at: datetime
+    updated_at: datetime
+
+
+class DocumentResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    workspace_id: UUID
+    display_name: str
+    active_version_id: UUID | None
+    created_by: UUID
+    deleted_at: datetime | None
+    created_at: datetime
+    updated_at: datetime
+    latest_version: DocumentVersionResponse | None = None
+
+
+class DocumentDetailResponse(DocumentResponse):
+    versions: list[DocumentVersionResponse]
+    jobs: list[JobResponse]
+
+
+class DocumentUploadResponse(BaseModel):
+    document: DocumentResponse
+    version: DocumentVersionResponse
+    job: JobResponse
 
 
 class ErrorResponse(BaseModel):

@@ -1,6 +1,10 @@
 import type {
   ApiErrorBody,
   AuthResponse,
+  DocumentDetail,
+  DocumentSummary,
+  DocumentUpload,
+  Job,
   Membership,
   RegisterRequest,
   Workspace,
@@ -135,6 +139,45 @@ export const api = {
     request<Membership>(
       `/workspaces/${workspaceId}/members`,
       { method: "POST", body: JSON.stringify({ email, role }) },
+      token,
+    ),
+  documents: (token: string, workspaceId: string) =>
+    request<DocumentSummary[]>(`/workspaces/${workspaceId}/documents`, {}, token),
+  document: (token: string, workspaceId: string, documentId: string) =>
+    request<DocumentDetail>(
+      `/workspaces/${workspaceId}/documents/${documentId}`,
+      {},
+      token,
+    ),
+  uploadDocument: (
+    token: string,
+    workspaceId: string,
+    file: File,
+    displayName: string,
+  ) => {
+    const body = new FormData();
+    body.set("file", file);
+    if (displayName.trim()) body.set("display_name", displayName.trim());
+    return request<DocumentUpload>(
+      `/workspaces/${workspaceId}/documents`,
+      {
+        method: "POST",
+        headers: { "Idempotency-Key": crypto.randomUUID() },
+        body,
+      },
+      token,
+    );
+  },
+  retryJob: (token: string, workspaceId: string, jobId: string) =>
+    request<Job>(
+      `/workspaces/${workspaceId}/jobs/${jobId}/retry`,
+      { method: "POST" },
+      token,
+    ),
+  deleteDocument: (token: string, workspaceId: string, documentId: string) =>
+    request<void>(
+      `/workspaces/${workspaceId}/documents/${documentId}`,
+      { method: "DELETE" },
       token,
     ),
 };

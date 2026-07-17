@@ -24,3 +24,12 @@ async def set_tenant_context(
         text("SELECT set_config('app.current_workspace_id', :workspace_id, true)"),
         {"workspace_id": str(workspace_id) if workspace_id else ""},
     )
+
+
+async def set_worker_context(session: AsyncSession, *, worker_id: str) -> None:
+    """Authorize a short queue-claim transaction across workspace RLS boundaries."""
+
+    await session.execute(
+        text("SELECT set_config('app.current_worker_id', :worker_id, true)"),
+        {"worker_id": worker_id[:128]},
+    )

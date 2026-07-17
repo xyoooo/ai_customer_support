@@ -27,3 +27,13 @@ class AuthenticationError(DomainError):
 class AuthorizationError(DomainError):
     status_code = 403
     code = "forbidden"
+
+
+class UploadRejectedError(DomainError):
+    status_code = 422
+    code = "upload_rejected"
+
+
+class UploadTooLargeError(DomainError):
+    status_code = 413
+    code = "upload_too_large"

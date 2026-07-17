@@ -3,6 +3,7 @@ import { Navigate, Outlet, RouterProvider, createBrowserRouter, useLocation } fr
 import { useAuth } from "./auth";
 import { AppShell } from "./components/AppShell";
 import { DashboardPage } from "./pages/DashboardPage";
+import { DocumentPage } from "./pages/DocumentPage";
 import { LoginPage } from "./pages/LoginPage";
 import { RegisterPage } from "./pages/RegisterPage";
 import { WorkspacePage } from "./pages/WorkspacePage";
@@ -18,8 +19,7 @@ function ProtectedRoute() {
 const router = createBrowserRouter([
   { path: "/login", element: <LoginPage /> },
   { path: "/register", element: <RegisterPage /> },
-  { element: <ProtectedRoute />, children: [{ element: <AppShell />, children: [{ index: true, element: <DashboardPage /> }, { path: "workspaces/:workspaceId", element: <WorkspacePage /> }] }] },
+  { element: <ProtectedRoute />, children: [{ element: <AppShell />, children: [{ index: true, element: <DashboardPage /> }, { path: "workspaces/:workspaceId", element: <WorkspacePage /> }, { path: "workspaces/:workspaceId/documents/:documentId", element: <DocumentPage /> }] }] },
 ]);
 
 export function App() { return <RouterProvider router={router} />; }
-

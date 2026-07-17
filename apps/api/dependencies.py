@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from functools import lru_cache
 from typing import Annotated
 from uuid import UUID
 
@@ -14,10 +15,32 @@ from packages.database.tenant import set_tenant_context
 from packages.domain.enums import WorkspaceRole
 from packages.security.rbac import role_is_allowed
 from packages.security.tokens import TokenError, decode_access_token
+from packages.storage import LocalObjectStore, MalwareScanner, NoopMalwareScanner, ObjectStore
 
 DatabaseSession = Annotated[AsyncSession, Depends(get_db_session)]
 AppSettings = Annotated[Settings, Depends(get_settings)]
 bearer = HTTPBearer(auto_error=False)
+
+
+@lru_cache
+def get_object_store() -> ObjectStore:
+    settings = get_settings()
+    return LocalObjectStore(
+        settings.object_store_root,
+        read_chunk_bytes=settings.upload_chunk_bytes,
+    )
+
+
+@lru_cache
+def get_malware_scanner() -> MalwareScanner:
+    settings = get_settings()
+    if not settings.allow_noop_malware_scanner:
+        raise RuntimeError("a production malware scanner adapter is not configured")
+    return NoopMalwareScanner()
+
+
+ObjectStoreDependency = Annotated[ObjectStore, Depends(get_object_store)]
+MalwareScannerDependency = Annotated[MalwareScanner, Depends(get_malware_scanner)]
 
 
 @dataclass(frozen=True)
@@ -87,4 +110,14 @@ AnyWorkspaceAccess = Annotated[WorkspaceAccess, Depends(require_workspace_roles(
 WorkspaceManagerAccess = Annotated[
     WorkspaceAccess,
     Depends(require_workspace_roles(WorkspaceRole.OWNER, WorkspaceRole.ADMIN)),
+]
+WorkspaceContributorAccess = Annotated[
+    WorkspaceAccess,
+    Depends(
+        require_workspace_roles(
+            WorkspaceRole.OWNER,
+            WorkspaceRole.ADMIN,
+            WorkspaceRole.AGENT,
+        )
+    ),
 ]

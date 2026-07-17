@@ -2,12 +2,66 @@
 
 - Status: accepted
 - Date: 2026-07-14
+- Last reviewed: 2026-07-17
 
 ## Context
 
 Week 2 adds uploads, immutable document versions, object storage, asynchronous processing, retries, and a worker. These features cross the HTTP, database, storage, security, and operational boundaries. Defining those boundaries before choosing an object-storage vendor or writing a worker prevents the domain model from depending on local filesystem paths, provider SDK types, or process-local task state.
 
 The system remains a modular monolith. PostgreSQL is the durable coordination system, and the API and worker are separate processes built from the same code and image.
+
+## Decision drivers
+
+- Preserve document provenance so future chunks, citations, and model runs can identify the exact source version.
+- Enforce tenant isolation at both the application and database layers.
+- Survive API and worker restarts without losing or silently duplicating work.
+- Keep the light demo runnable without another paid or stateful service.
+- Avoid leaking local filesystem or cloud-provider details into domain and API contracts.
+- Make concurrency, retries, failure states, and cleanup behavior observable and testable.
+
+## Options comparison
+
+### Document lifecycle
+
+| Option | Advantages | Limitations |
+|---|---|---|
+| Logical document with immutable versions | Preserves provenance; supports safe activation, history, duplicate detection, and rollback; citations can name an exact version | Adds version and activation state; storage grows until retention cleanup runs |
+| Single mutable document row | Smallest schema; replacement is simple | Overwrites provenance; citations can silently refer to changed content; a failed replacement can displace known-good content |
+| Global content-addressed blobs shared across workspaces | Maximum storage deduplication; one physical copy per checksum | Cross-tenant reference counting, deletion, authorization, and privacy rules are complex; identical bytes can reveal information across tenants if designed poorly |
+
+### Object storage
+
+| Option | Advantages | Limitations |
+|---|---|---|
+| Application-owned `ObjectStore` interface with local adapter | Free and simple locally; domain contracts stay portable; a managed adapter can replace it later | Local disk is not shared across instances and needs explicit backup and cleanup; not suitable for replaceable production instances |
+| Managed object storage used through the same interface | Durable, scalable, shared across instances; supports lifecycle and signed delivery features | Provider configuration, credentials, network failures, and possible cost; unnecessary for a single local instance |
+| Store document bytes in PostgreSQL | Transactional with metadata; one backup system | Large binary I/O and growth burden the relational database; database backups and replication become heavier |
+| Use filesystem paths directly in domain code | Minimal abstraction and quick prototype | Couples business logic and persisted records to one host layout; unsafe migration to cloud storage; paths can leak implementation details |
+
+### Upload transport
+
+| Option | Advantages | Limitations |
+|---|---|---|
+| Stream through the API | Centralizes authorization, byte limits, signature validation, checksums, and staging cleanup; works with local storage | API carries upload bandwidth; requires streaming timeout and cancellation handling |
+| Buffer the whole file in API memory | Easiest handler implementation | Memory use grows with file size and concurrent uploads; weak failure behavior for large files |
+| Direct signed upload to managed storage | Removes most upload bandwidth from the API; supports multipart and resumable uploads | Requires shared managed storage, a finalization protocol, abandoned-upload cleanup, and a larger authorization threat surface |
+
+### Job execution
+
+| Option | Advantages | Limitations |
+|---|---|---|
+| PostgreSQL job table with leases | Enqueue can share the document transaction; durable across process restarts; no additional service; SQL supports inspection and recovery | Polling adds database load; lease and retry logic must be implemented; not optimized for very high queue throughput |
+| In-process background task | Almost no infrastructure or queue code | Work can disappear on API restart; no safe multi-worker coordination, durable retries, or dead-letter inspection |
+| Redis with Celery or a similar worker framework | Mature task routing, scheduling, retries, and worker ecosystem | Adds Redis and framework operations; database changes and job publication need consistency handling |
+| Managed message queue | Strong durability and independent scaling; managed delivery and dead-letter features | Adds cloud dependency and cost; local parity is harder; transactional outbox is needed to coordinate database state with publication |
+
+### Deployment boundary
+
+| Option | Advantages | Limitations |
+|---|---|---|
+| Separate API and worker processes from the same image | Processing survives request completion; processes can restart and scale independently; code and contracts remain shared | API and worker normally share a release; worker permissions need deliberate separation |
+| Process documents inside the API request | Simple synchronous control flow; immediate result | Request latency, cancellation, timeouts, and resource use become coupled to long processing |
+| Independent ingestion microservice | Independent deployment, ownership, scaling, and credentials | Adds network contracts, distributed failure handling, and deployment coordination before the workload or team requires them |
 
 ## Decision
 
@@ -80,17 +134,25 @@ Queue behavior follows these rules:
 
 Every worker database transaction sets the workspace context using the workspace loaded from the authoritative job row. The worker does not trust a workspace identifier supplied only inside the job payload.
 
+The Week 2 local implementation uses a transaction-local `app.current_worker_id` only for cross-workspace queue discovery, then returns to workspace-scoped RLS for processing. It currently shares the restricted application database credential. This is an explicit demo-stage deviation from a distinct service-principal credential and must be hardened before production or independent worker deployment.
+
 ### Permissions
 
 - Any active workspace member may list documents and view versions and processing status.
 - `owner`, `admin`, and `agent` may upload a document or new version and retry a failed processing job.
 - Only `owner` and `admin` may rename or delete documents.
 - Activation is performed by the worker after successful processing, not directly by a browser request.
-- A worker identity is a service principal with only the table and object operations its job types require; it is not represented as a workspace member.
+- A production worker identity is a service principal with only the table and object operations its job types require; it is not represented as a workspace member. The Week 2 local credential deviation is recorded above and in the review report.
 
 ### Observability contract
 
 API and worker logs bind `request_id`, `workspace_id`, `document_id`, `document_version_id`, and `job_id` when available. Error fields contain bounded codes and safe summaries. Raw document text, object credentials, cookies, tokens, signed URLs, and full provider payloads are excluded from general logs.
+
+## Why this suits the current stage
+
+Week 2 needs durable and testable document processing, but the demo runs on one development host and targets a small hosted workload. Immutable versions and durable PostgreSQL jobs protect correctness now. The `ObjectStore` boundary and separate worker process preserve migration paths without requiring managed storage, Redis, or another deployed service before their value is measurable.
+
+The selected combination also keeps the most failure-prone transition, creating a document version and enqueueing its work, inside one database transaction. The additional lease, cleanup, and reconciliation logic is visible and testable, which is preferable at this stage to hiding those responsibilities behind process-local tasks.
 
 ## Required verification
 
@@ -109,6 +171,26 @@ The implementation is not complete until automated tests cover:
 
 ## Consequences
 
-The API can use simple local storage and a PostgreSQL worker during the demo while preserving a migration path to managed object storage and an external queue. The design adds explicit staging cleanup, reconciliation, and lease tests, but those costs are preferable to hidden in-memory jobs or vendor-specific data leaking into domain contracts.
+### Advantages accepted
 
-Redis, a message broker, direct browser-to-cloud uploads, and provider-specific storage features remain optional. They will be introduced only when measured throughput, upload size, or hosting constraints justify them.
+- The demo can use simple local storage and a PostgreSQL worker while preserving migration paths to managed storage and an external queue.
+- Immutable versions keep failed replacements from displacing known-good content.
+- Durable, inspectable jobs survive API and worker restarts.
+- Provider details remain behind application-owned interfaces.
+
+### Limitations accepted
+
+- The application owns staging cleanup, reconciliation, lease, retry, and dead-letter behavior.
+- Local object storage is tied to one host and is not a production high-availability design.
+- PostgreSQL polling consumes database capacity and requires explicit queue monitoring.
+- Redis, a message broker, direct browser-to-cloud uploads, and provider-specific storage features remain unavailable until measured throughput, upload size, or hosting constraints justify them.
+
+## When to reconsider
+
+- Add a managed `ObjectStore` adapter when instances become replaceable or storage must be shared across deployments.
+- Add signed, multipart, or resumable uploads when file sizes or API bandwidth become measured constraints.
+- Add production malware scanning, quarantine, DLP, retention, and KMS-backed encryption before accepting untrusted or real customer content.
+- Replace or supplement the PostgreSQL queue when queue latency, throughput, database contention, or worker scaling is outside the measured operating target.
+- Use a transactional outbox if job publication moves to an external queue and must remain consistent with database changes.
+- Extract an ingestion service only when its deployment cadence, ownership, reliability target, or resource profile materially diverges from the API.
+- Consider global content-addressed deduplication only after storage measurements justify the added cross-tenant deletion and privacy design.

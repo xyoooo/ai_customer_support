@@ -1,9 +1,10 @@
-# SupportPilot Week 1 Development Report
+# SupportPilot Week 1 Review Report
 
-**Stage:** Foundation  
-**Status:** Complete and locally validated  
-**Report date:** July 14, 2026  
-**Project:** Enterprise-style AI customer support platform
+- **Stage:** Foundation
+- **Status:** Complete and locally validated
+- **Document type:** Weekly review report
+- **Report date:** July 14, 2026
+- **Project:** Enterprise-style AI customer support platform
 
 ## 1. Executive summary
 
@@ -173,7 +174,7 @@ One dependency-level warning remains: the installed FastAPI test client reports 
 
 ## 6. Known limitations
 
-- The existing `.git` directory is empty, so the folder is not yet a functional Git repository and the configured GitHub Actions workflow has not run on GitHub.
+- At the time of the original Week 1 validation, the repository and remote CI status had not yet been confirmed. As of July 16, the local repository is on `main`, tracks `origin/main`, and has a clean working tree before the weekly-document changes; the latest remote CI result still needs to be confirmed.
 - Local database passwords and the development JWT secret are intentionally demo values. They are not suitable for deployment.
 - Registration has no email verification, invitation token, password reset, OAuth, or MFA workflow.
 - A user must register before being added to another workspace.

@@ -4,6 +4,10 @@ import psycopg
 import pytest
 from fastapi.testclient import TestClient
 
+from apps.api.dependencies import get_object_store
+from apps.api.main import app
+from packages.storage.local import LocalObjectStore
+
 pytestmark = [pytest.mark.integration, pytest.mark.security]
 APP_URL = "postgresql://supportpilot_app:local_app_password@localhost:5432/supportpilot_test"
 
@@ -125,3 +129,67 @@ def test_transaction_local_context_does_not_leak(client: TestClient) -> None:
                 == ""
             )
             assert connection.execute("SELECT count(*) FROM workspaces").fetchone()[0] == 0
+
+
+def test_document_tables_block_direct_cross_workspace_access(client: TestClient, tmp_path) -> None:  # type: ignore[no-untyped-def]
+    app.dependency_overrides[get_object_store] = lambda: LocalObjectStore(tmp_path)
+    try:
+        user_a, token_a, workspace_a = register(client, "documents-a")
+        _, token_b, workspace_b = register(client, "documents-b")
+
+        def upload(token: str, workspace_id: object, suffix: str) -> dict[str, object]:
+            response = client.post(
+                f"/api/v1/workspaces/{workspace_id}/documents",
+                headers={
+                    "Authorization": f"Bearer {token}",
+                    "Idempotency-Key": f"isolation-{suffix}",
+                },
+                files={
+                    "file": (
+                        f"isolation-{suffix}.md",
+                        f"# Workspace {suffix}\n".encode(),
+                        "text/markdown",
+                    )
+                },
+            )
+            assert response.status_code == 201, response.text
+            return response.json()
+
+        upload_a = upload(token_a, workspace_a["id"], "a")
+        upload_b = upload(token_b, workspace_b["id"], "b")
+
+        cross_api = client.get(
+            f"/api/v1/workspaces/{workspace_b['id']}/documents/{upload_b['document']['id']}",
+            headers={"Authorization": f"Bearer {token_a}"},
+        )
+        assert cross_api.status_code == 404
+
+        with psycopg.connect(APP_URL) as connection, connection.transaction():
+            connection.execute(
+                "SELECT set_config('app.current_user_id', %s, true)",
+                (str(user_a["id"]),),
+            )
+            connection.execute(
+                "SELECT set_config('app.current_workspace_id', %s, true)",
+                (str(workspace_a["id"]),),
+            )
+            assert connection.execute("SELECT count(*) FROM documents").fetchone() == (1,)
+            assert connection.execute("SELECT count(*) FROM document_versions").fetchone() == (1,)
+            assert connection.execute("SELECT count(*) FROM jobs").fetchone() == (1,)
+            assert (
+                connection.execute(
+                    "UPDATE documents SET display_name = 'blocked' WHERE id = %s RETURNING id",
+                    (str(upload_b["document"]["id"]),),
+                ).fetchall()
+                == []
+            )
+            assert (
+                connection.execute(
+                    "DELETE FROM jobs WHERE id = %s RETURNING id",
+                    (str(upload_b["job"]["id"]),),
+                ).fetchall()
+                == []
+            )
+        assert upload_a["document"]["id"] != upload_b["document"]["id"]
+    finally:
+        app.dependency_overrides.pop(get_object_store, None)

@@ -31,6 +31,17 @@ services:
         condition: service_healthy
     restart: "no"
 
+  storage-init:
+    build:
+      context: .
+      dockerfile: infra/docker/api.Dockerfile
+      target: runtime
+    user: "0:0"
+    command: ["chown", "-R", "10001:10001", "/app/var/objects"]
+    volumes:
+      - document_data:/app/var/objects
+    restart: "no"
+
   api:
     build:
       context: .
@@ -42,17 +53,44 @@ services:
       SUPPORTPILOT_JWT_SECRET: local-development-secret-change-before-deployment
       SUPPORTPILOT_ALLOWED_ORIGINS: '["http://localhost:5173"]'
       SUPPORTPILOT_SECURE_COOKIES: "false"
+      SUPPORTPILOT_OBJECT_STORE_ROOT: /app/var/objects
+      SUPPORTPILOT_ALLOW_NOOP_MALWARE_SCANNER: "true"
     command: ["uvicorn", "apps.api.main:app", "--host", "0.0.0.0", "--port", "8000"]
     ports:
       - "8000:8000"
+    volumes:
+      - document_data:/app/var/objects
     depends_on:
       migrate:
+        condition: service_completed_successfully
+      storage-init:
         condition: service_completed_successfully
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health/ready')"]
       interval: 5s
       timeout: 3s
       retries: 20
+
+  worker:
+    build:
+      context: .
+      dockerfile: infra/docker/api.Dockerfile
+      target: runtime
+    environment:
+      SUPPORTPILOT_ENVIRONMENT: development
+      SUPPORTPILOT_DATABASE_URL: postgresql+asyncpg://supportpilot_app:local_app_password@db:5432/supportpilot
+      SUPPORTPILOT_JWT_SECRET: local-development-secret-change-before-deployment
+      SUPPORTPILOT_OBJECT_STORE_ROOT: /app/var/objects
+      SUPPORTPILOT_ALLOW_NOOP_MALWARE_SCANNER: "true"
+    command: ["python", "-m", "apps.worker.main"]
+    volumes:
+      - document_data:/app/var/objects
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      storage-init:
+        condition: service_completed_successfully
+    restart: unless-stopped
 
   web:
     build:
@@ -69,3 +107,4 @@ services:
 
 volumes:
   postgres_data:
+  document_data:

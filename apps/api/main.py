@@ -7,7 +7,7 @@ from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from apps.api.routes import auth, health, workspaces
+from apps.api.routes import auth, documents, health, workspaces
 from packages.config import get_settings
 from packages.database.session import get_engine
 from packages.domain.errors import DomainError
@@ -39,7 +39,7 @@ app.add_middleware(
     allow_origins=settings.allowed_origins,
     allow_credentials=True,
     allow_methods=["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
-    allow_headers=["Authorization", "Content-Type", "X-Request-ID"],
+    allow_headers=["Authorization", "Content-Type", "X-Request-ID", "Idempotency-Key"],
 )
 
 
@@ -76,6 +76,7 @@ async def handle_domain_error(request: Request, exc: DomainError) -> JSONRespons
 app.include_router(health.router)
 app.include_router(auth.router, prefix="/api/v1")
 app.include_router(workspaces.router, prefix="/api/v1")
+app.include_router(documents.router, prefix="/api/v1")
 
 
 @app.get("/api/v1", tags=["meta"])
