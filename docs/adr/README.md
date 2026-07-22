@@ -11,6 +11,7 @@ ADRs record an important technical choice, why it fits the product now, which li
 | [0003](0003-authentication-sessions.md) | Use short-lived JWT access tokens with rotating opaque sessions | Accepted |
 | [0004](0004-document-lifecycle-and-durable-jobs.md) | Use immutable document versions, portable object storage, and durable jobs | Accepted |
 | [0005](0005-postgresql-and-pgvector.md) | Use PostgreSQL with pgvector as the primary data and retrieval store | Accepted |
+| [0006](0006-lab-evaluation-and-single-rag-production-pipeline.md) | Evaluate RAG strategies in a lab branch and productionize one selected pipeline | Accepted |
 
 ## Required structure
 

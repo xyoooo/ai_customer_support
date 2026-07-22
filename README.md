@@ -38,4 +38,4 @@ See the [weekly progress index](docs/weekly-progress.md) for the preview plan an
 
 Week 1's delivered scope and evidence are recorded in the [Week 1 review report](docs/week-1-review-report.md). The [Week 2 preview plan](docs/week-2-preview-plan.md) defines the document-lifecycle milestone, acceptance criteria, and handoff to the RAG baseline.
 
-The accepted [document lifecycle and durable-job ADR](docs/adr/0004-document-lifecycle-and-durable-jobs.md) defines the stable boundary for Week 2 implementation.
+The accepted [document lifecycle and durable-job ADR](docs/adr/0004-document-lifecycle-and-durable-jobs.md) defines the stable boundary for Week 2 implementation. The [Week 3 preview plan](docs/week-3-preview-plan.md) defines the lab-based chunking and embedding comparison, manual selection gate, and single-pipeline production milestone. [ADR 0006](docs/adr/0006-lab-evaluation-and-single-rag-production-pipeline.md) records why the lab branch is not merged and only the selected solution enters `main`.
