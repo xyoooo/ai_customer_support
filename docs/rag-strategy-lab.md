@@ -232,6 +232,15 @@ Every initial embedding adapter must pass:
 - Model loading never downloads implicitly during a normal offline evaluation run.
 - Raw document text and vectors are absent from general logs.
 
+The initial E0-E2 profiles use explicit model-tokenizer-aware right truncation when a
+chunk exceeds the candidate's declared input limit. The adapter preserves the beginning
+of the embedding input, including deterministic C2 context, records this policy in the
+profile fingerprint, and verifies the fitted text again with special tokens enabled before
+inference. Stored source text and citation spans remain unchanged. This policy is necessary
+because the lab's deterministic chunking tokenizer and each embedding model's subword
+tokenizer do not produce identical counts. Every report records the number of truncated
+document and query inputs so the manual selection can account for this trade-off.
+
 ## 7. Future chunking candidates
 
 The following strategies are catalogued for later lab cycles. They are not Week 3 implementation commitments.

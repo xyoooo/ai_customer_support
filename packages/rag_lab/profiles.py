@@ -41,6 +41,7 @@ class EmbeddingSpec:
     query_prefix: str
     document_prefix: str
     license: str
+    truncation_policy: str = "reject"
 
     def __post_init__(self) -> None:
         if len(self.artifact_revision) != 40:
@@ -49,6 +50,8 @@ class EmbeddingSpec:
             raise ValueError("embedding dimension and input limit must be positive")
         if not self.license:
             raise ValueError("embedding license metadata is required")
+        if self.truncation_policy not in {"reject", "right"}:
+            raise ValueError("embedding truncation policy must be reject or right")
 
 
 @dataclass(frozen=True, slots=True)
@@ -165,6 +168,7 @@ _EMBEDDINGS = {
         query_prefix="Represent this sentence for searching relevant passages: ",
         document_prefix="",
         license="MIT",
+        truncation_policy="right",
     ),
     "E1": EmbeddingSpec(
         candidate_id="E1",
@@ -179,6 +183,7 @@ _EMBEDDINGS = {
         query_prefix="Represent this sentence for searching relevant passages: ",
         document_prefix="",
         license="Apache-2.0",
+        truncation_policy="right",
     ),
     "E2": EmbeddingSpec(
         candidate_id="E2",
@@ -193,6 +198,7 @@ _EMBEDDINGS = {
         query_prefix="",
         document_prefix="",
         license="Apache-2.0",
+        truncation_policy="right",
     ),
 }
 

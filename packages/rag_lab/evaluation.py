@@ -55,6 +55,7 @@ class ResourceMetrics:
     vector_bytes: int
     retrieval_p50_ms: float
     retrieval_p95_ms: float
+    truncated_embedding_inputs: int
 
 
 @dataclass(frozen=True, slots=True)
@@ -254,6 +255,7 @@ class ExperimentRunner:
             vector_bytes=chunk_count * profile.embedding.dimension * 4,
             retrieval_p50_ms=statistics.median(latencies) if latencies else 0.0,
             retrieval_p95_ms=_percentile(latencies, 0.95),
+            truncated_embedding_inputs=embedder.truncated_input_count,
         )
         return ExperimentReport(
             report_schema="rag-lab-report-v1",

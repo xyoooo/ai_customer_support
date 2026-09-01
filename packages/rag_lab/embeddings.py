@@ -18,6 +18,9 @@ from packages.rag_lab.tokenizer import RegexTokenizer
 class EmbeddingAdapter(Protocol):
     spec: EmbeddingSpec
 
+    @property
+    def truncated_input_count(self) -> int: ...
+
     def embed_documents(self, texts: Sequence[str]) -> tuple[tuple[float, ...], ...]: ...
 
     def embed_queries(self, texts: Sequence[str]) -> tuple[tuple[float, ...], ...]: ...
@@ -87,6 +90,7 @@ class FastEmbedAdapter:
         if not tokenizer_path.is_file():
             raise RuntimeError("offline model tokenizer.json is missing")
         self.spec = spec
+        self._truncated_input_count = 0
         self._tokenizer = Tokenizer.from_file(str(tokenizer_path))
         self._tokenizer.no_truncation()
         self._model = TextEmbedding(
@@ -95,18 +99,46 @@ class FastEmbedAdapter:
             specific_model_path=str(model_path),
         )
 
+    def _fit_model_limit(self, prepared: str) -> str:
+        encoded = self._tokenizer.encode(prepared, add_special_tokens=True)
+        if len(encoded.ids) <= self.spec.input_limit:
+            return prepared
+        if self.spec.truncation_policy == "reject":
+            raise ValueError(
+                f"embedding input has {len(encoded.ids)} model tokens; "
+                f"limit is {self.spec.input_limit}"
+            )
+
+        special_tokens = len(self._tokenizer.encode("", add_special_tokens=True).ids)
+        budget = self.spec.input_limit - special_tokens
+        if budget < 1:
+            raise ValueError("embedding input limit cannot hold content and special tokens")
+        content_ids = self._tokenizer.encode(prepared, add_special_tokens=False).ids
+        fitted_ids = content_ids[:budget]
+        fitted = self._tokenizer.decode(fitted_ids, skip_special_tokens=True).strip()
+        while (
+            fitted
+            and len(self._tokenizer.encode(fitted, add_special_tokens=True).ids)
+            > self.spec.input_limit
+        ):
+            fitted_ids = fitted_ids[:-1]
+            fitted = self._tokenizer.decode(fitted_ids, skip_special_tokens=True).strip()
+        if not fitted:
+            raise ValueError("embedding truncation removed all content")
+        self._truncated_input_count += 1
+        return fitted
+
+    @property
+    def truncated_input_count(self) -> int:
+        return self._truncated_input_count
+
     def _prepare(self, text: str, *, query: bool) -> str:
         stripped = text.strip()
         if not stripped:
             raise ValueError("embedding input cannot be empty")
         prefix = self.spec.query_prefix if query else self.spec.document_prefix
         prepared = f"{prefix}{stripped}"
-        token_count = len(self._tokenizer.encode(prepared, add_special_tokens=True).ids)
-        if token_count > self.spec.input_limit:
-            raise ValueError(
-                f"embedding input has {token_count} model tokens; limit is {self.spec.input_limit}"
-            )
-        return prepared
+        return self._fit_model_limit(prepared)
 
     def _embed(self, texts: Sequence[str], *, query: bool) -> tuple[tuple[float, ...], ...]:
         if not texts:
@@ -133,15 +165,24 @@ class DeterministicHashAdapter:
     def __init__(self, spec: EmbeddingSpec) -> None:
         self.spec = spec
         self._tokenizer = RegexTokenizer()
+        self._truncated_input_count = 0
 
     def _prepare(self, text: str, *, query: bool) -> str:
         stripped = text.strip()
         if not stripped:
             raise ValueError("embedding input cannot be empty")
         prepared = f"{self.spec.query_prefix if query else self.spec.document_prefix}{stripped}"
-        if self._tokenizer.count(prepared) > self.spec.input_limit:
+        tokens = self._tokenizer.spans(prepared)
+        if len(tokens) > self.spec.input_limit and self.spec.truncation_policy == "reject":
             raise ValueError("embedding input exceeds the declared input limit")
+        if len(tokens) > self.spec.input_limit:
+            prepared = prepared[: tokens[self.spec.input_limit - 1].end]
+            self._truncated_input_count += 1
         return prepared
+
+    @property
+    def truncated_input_count(self) -> int:
+        return self._truncated_input_count
 
     def _vector(self, text: str, *, query: bool) -> tuple[float, ...]:
         prepared = self._prepare(text, query=query)

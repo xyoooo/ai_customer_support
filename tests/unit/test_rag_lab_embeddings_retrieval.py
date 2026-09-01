@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import math
+from dataclasses import replace
 
 import pytest
 
@@ -63,6 +64,14 @@ def test_deterministic_embedding_contract_is_normalized_and_batch_stable() -> No
         adapter.embed_queries([" "])
     with pytest.raises(ValueError, match="input limit"):
         DeterministicHashAdapter(_embedding_spec(input_limit=1)).embed_documents(["too long"])
+
+    truncating = DeterministicHashAdapter(
+        replace(_embedding_spec(input_limit=3), truncation_policy="right")
+    )
+    assert truncating.embed_documents(["one two three four"]) == truncating.embed_documents(
+        ["one two three"]
+    )
+    assert truncating.truncated_input_count == 2
 
 
 def test_offline_model_manifest_fails_closed_before_model_loading(tmp_path) -> None:

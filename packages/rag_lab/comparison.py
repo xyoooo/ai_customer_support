@@ -15,6 +15,7 @@ class ComparisonRow:
     ndcg_at_5: float
     citation_span_coverage: float
     retrieval_p95_ms: float
+    truncated_embedding_inputs: int
     wins: int
     ties: int
     losses: int
@@ -74,6 +75,7 @@ def compare_reports(paths: list[Path]) -> tuple[ComparisonRow, ...]:
                 ndcg_at_5=quality["ndcg_at_5"],
                 citation_span_coverage=quality["citation_span_coverage"],
                 retrieval_p95_ms=resources["retrieval_p95_ms"],
+                truncated_embedding_inputs=resources.get("truncated_embedding_inputs", 0),
                 wins=wins,
                 ties=ties,
                 losses=losses,
@@ -88,13 +90,15 @@ def render_markdown(rows: tuple[ComparisonRow, ...]) -> str:
         "",
         "This table is diagnostic evidence only; it does not select a winner automatically.",
         "",
-        "| Profile | Recall@5 | MRR | nDCG@5 | Citation coverage | p95 ms | W/T/L vs control |",
-        "|---|---:|---:|---:|---:|---:|---:|",
+        "| Profile | Recall@5 | MRR | nDCG@5 | Citation coverage | p95 ms | "
+        "Truncated inputs | W/T/L vs control |",
+        "|---|---:|---:|---:|---:|---:|---:|---:|",
     ]
     lines.extend(
         f"| {row.profile_id} | {row.recall_at_5:.3f} | "
         f"{row.mean_reciprocal_rank:.3f} | {row.ndcg_at_5:.3f} | "
         f"{row.citation_span_coverage:.3f} | {row.retrieval_p95_ms:.2f} | "
+        f"{row.truncated_embedding_inputs} | "
         f"{row.wins}/{row.ties}/{row.losses} |"
         for row in rows
     )

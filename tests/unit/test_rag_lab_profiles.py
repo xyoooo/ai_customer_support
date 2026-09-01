@@ -61,6 +61,22 @@ def test_candidate_spec_validation_rejects_ambiguous_profiles() -> None:
             "",
             "MIT",
         )
+    with pytest.raises(ValueError, match="truncation policy"):
+        EmbeddingSpec(
+            "E",
+            "provider",
+            "model",
+            "artifact",
+            "a" * 40,
+            3,
+            10,
+            "mean",
+            True,
+            "",
+            "",
+            "MIT",
+            "middle",
+        )
     with pytest.raises(ValueError, match="cosine"):
         RetrievalSpec(distance="euclidean")
     with pytest.raises(ValueError, match="english"):

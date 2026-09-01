@@ -150,6 +150,7 @@ def test_experiment_runner_reports_quality_resources_and_no_raw_content(tmp_path
     assert report.resources.document_count == 2
     assert report.resources.chunk_count == 2
     assert report.resources.vector_bytes == 2 * 32 * 4
+    assert report.resources.truncated_embedding_inputs == 0
     assert report.profile_fingerprint == profile.fingerprint
 
     output = tmp_path / "report.json"
