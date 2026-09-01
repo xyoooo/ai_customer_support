@@ -11,11 +11,27 @@ updates:
     directory: /apps/web
     schedule:
       interval: weekly
+      day: monday
+      time: "09:00"
+      timezone: Asia/Singapore
+    cooldown:
+      semver-major-days: 30
+      semver-minor-days: 7
+      semver-patch-days: 3
     ignore:
-      - dependency-name: typescript
+      - dependency-name: "*"
         update-types: ["version-update:semver-major"]
     groups:
-      frontend-dependencies:
+      frontend-runtime:
+        applies-to: version-updates
+        dependency-type: production
+        update-types: [minor, patch]
+      frontend-tooling:
+        applies-to: version-updates
+        dependency-type: development
+        update-types: [minor, patch]
+      frontend-security:
+        applies-to: security-updates
         patterns: ["*"]
   - package-ecosystem: github-actions
     directory: /
