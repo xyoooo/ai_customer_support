@@ -1,0 +1,62 @@
+{
+  "schema_version": "rag-lab-dataset-v1",
+  "dataset_version": "week3-smoke-v1",
+  "documents": [
+    {
+      "workspace_id": "11111111-1111-1111-1111-111111111111",
+      "document_id": "22222222-2222-2222-2222-222222222222",
+      "version_id": "33333333-3333-3333-3333-333333333333",
+      "title": "Returns",
+      "media_type": "text/markdown",
+      "source_path": "returns.md",
+      "active": true
+    },
+    {
+      "workspace_id": "44444444-4444-4444-4444-444444444444",
+      "document_id": "55555555-5555-5555-5555-555555555555",
+      "version_id": "66666666-6666-6666-6666-666666666666",
+      "title": "Private escalation",
+      "media_type": "text/plain",
+      "source_path": "private.txt",
+      "active": true
+    }
+  ],
+  "cases": [
+    {
+      "case_id": "return-window",
+      "workspace_id": "11111111-1111-1111-1111-111111111111",
+      "query": "How long do I have to request an international return?",
+      "tags": ["direct_lookup", "semantic_paraphrase"],
+      "evidence": [
+        {
+          "version_id": "33333333-3333-3333-3333-333333333333",
+          "block_id": "b000001",
+          "char_start": 0,
+          "char_end": 21
+        }
+      ]
+    },
+    {
+      "case_id": "authorization-code",
+      "workspace_id": "11111111-1111-1111-1111-111111111111",
+      "query": "RET-30",
+      "tags": ["exact_identifier"],
+      "evidence": [
+        {
+          "version_id": "33333333-3333-3333-3333-333333333333",
+          "block_id": "b000002",
+          "char_start": 0,
+          "char_end": 29
+        }
+      ]
+    },
+    {
+      "case_id": "private-code-probe",
+      "workspace_id": "11111111-1111-1111-1111-111111111111",
+      "query": "What is the private escalation code?",
+      "tags": ["cross_workspace", "unanswerable"],
+      "evidence": [],
+      "unanswerable": true
+    }
+  ]
+}

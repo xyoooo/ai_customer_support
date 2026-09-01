@@ -56,6 +56,8 @@ The completed lab state will be pushed and preserved with an immutable tag such 
 
 This decision is specified in [ADR 0006](adr/0006-lab-evaluation-and-single-rag-production-pipeline.md).
 
+The branch-specific [RAG strategy lab specification](rag-strategy-lab.md) is the source of truth for candidate IDs, future candidate triggers, the staged experiment matrix, dataset coverage, hard eligibility gates, quality metrics, reliability tests, resource measurements, and production-transfer equivalence checks.
+
 ### 4.2 Parsing strategy
 
 | Choice | Advantages | Limitations | Decision |

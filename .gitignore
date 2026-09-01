@@ -14,4 +14,6 @@ playwright-report/
 test-results/
 *.log
 var/
+experiments/rag/results/
+experiments/rag/model-cache/
 .DS_Store
