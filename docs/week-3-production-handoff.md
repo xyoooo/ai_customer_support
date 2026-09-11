@@ -40,8 +40,9 @@ production branch. The handoff must not overwrite or hide them.
 
 ### 2.2 Freeze the implementation
 
-Organize the current work into two auditable commits. Create the functional commit first;
-create the documentation commit only after the committed-code matrix has completed:
+Organize the current work into auditable commits. Create the functional commit first;
+create the documentation commit only after the committed-code matrix has completed, and
+keep any later gate-hardening change behavior-neutral:
 
 1. `feat: calibrate the RAG strategy lab`
    - parser v2 and source locators;
@@ -53,6 +54,10 @@ create the documentation commit only after the committed-code matrix has complet
    - reviewed benchmark manifest;
    - challenge review guide;
    - selection report, ADR outcome, and this handoff plan.
+3. `test: close the RAG lab health gates`
+   - focused model, parser, and shared-token-budget coverage;
+   - current frontend advisory fixes within existing dependency ranges;
+   - final branch validation evidence.
 
 Do not combine generated model data or raw local reports with either commit.
 

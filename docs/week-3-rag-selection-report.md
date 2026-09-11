@@ -101,6 +101,25 @@ Challenge 018 asks for unknowable personal spyware details. A fixed top-k retrie
 still return related passages; correct handling belongs to answerability and grounded
 generation evaluation, not a rule that requires zero retrieval results.
 
+## Final branch validation
+
+The finalized lab branch passed the following checks on September 11, 2026:
+
+- Ruff lint and formatting, plus strict mypy over `apps` and `packages`.
+- 75 backend tests with 86.95% combined statement/branch coverage, including 19
+  PostgreSQL integration tests and 4 tenant-isolation security tests.
+- A test-database migration cycle from base through Alembic head `20260910_0004`.
+- Frontend lint, 4 component tests, production build, and generated OpenAPI synchronization.
+- `npm audit --audit-level=high` with zero reported vulnerabilities.
+- Successful API, worker, and web container builds from the final lockfiles.
+- A clean tracked-file check with no corpus, model cache, vector, database dump, or raw
+  result artifact in Git.
+
+The existing Starlette test-client deprecation warning remains non-blocking and is unchanged
+from the earlier milestones. The final hardening tests and dependency lock update do not
+alter the evaluated parser, candidate, embedding, or retrieval implementation at commit
+`8fcdba7`.
+
 ## Decision limits
 
 This is a selection for the current Apple-heavy corpus, reviewed retrieval dataset, local

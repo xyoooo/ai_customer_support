@@ -113,6 +113,92 @@ def test_pdf_layout_helpers_preserve_columns_paragraphs_and_lists() -> None:
     ]
 
 
+def test_pdf_word_extraction_filters_margins_and_preserves_segments() -> None:
+    class FakePage:
+        width = 612
+        height = 792
+
+        @staticmethod
+        def extract_words(**kwargs: object) -> list[dict[str, object]]:
+            assert kwargs["extra_attrs"] == ["fontname", "size"]
+            return [
+                {
+                    "text": "Header",
+                    "top": 10,
+                    "bottom": 20,
+                    "x0": 40,
+                    "x1": 80,
+                    "size": 9,
+                    "fontname": "Regular",
+                },
+                {
+                    "text": "Left",
+                    "top": 100,
+                    "bottom": 110,
+                    "x0": 40,
+                    "x1": 80,
+                    "size": 11,
+                    "fontname": "Regular",
+                },
+                {
+                    "text": "bold",
+                    "top": 100.5,
+                    "bottom": 111,
+                    "x0": 86,
+                    "x1": 120,
+                    "size": 11,
+                    "fontname": "Semibold",
+                },
+                {
+                    "text": "Right",
+                    "top": 100,
+                    "bottom": 110,
+                    "x0": 300,
+                    "x1": 345,
+                    "size": 9,
+                    "fontname": "Regular",
+                },
+                {
+                    "text": "•",
+                    "top": 130,
+                    "bottom": 140,
+                    "x0": 40,
+                    "x1": 45,
+                    "size": 9,
+                    "fontname": "Regular",
+                },
+                {
+                    "text": "Apple Guide 7",
+                    "top": 740,
+                    "bottom": 750,
+                    "x0": 40,
+                    "x1": 100,
+                    "size": 7,
+                    "fontname": "Regular",
+                },
+                {
+                    "text": "Footer",
+                    "top": 770,
+                    "bottom": 785,
+                    "x0": 40,
+                    "x1": 80,
+                    "size": 9,
+                    "fontname": "Regular",
+                },
+            ]
+
+    lines = CanonicalParser._pdf_lines(FakePage())
+
+    assert [line.text for line in lines] == ["Left bold", "Right"]
+    assert lines[0].fontname == "Semibold"
+    assert lines[0].is_bold
+    assert CanonicalParser._reading_order([], 612) == []
+    assert CanonicalParser._visual_heading_level(_PdfLine("Title", 0, 1, 0, 1, 20, "Regular")) == 1
+    assert CanonicalParser._visual_heading_level(_PdfLine("Sub", 0, 1, 0, 1, 17, "Regular")) == 2
+    assert CanonicalParser._visual_heading_level(_PdfLine("Callout", 0, 1, 0, 1, 11, "Bold")) == 4
+    assert CanonicalParser._visual_heading_level(_PdfLine("Body", 0, 1, 0, 1, 9, "Regular")) is None
+
+
 def test_fixed_token_control_has_stable_overlap_and_no_duplicate_final_chunk() -> None:
     document = CanonicalParser().parse(
         b"one two three four five six seven eight",
