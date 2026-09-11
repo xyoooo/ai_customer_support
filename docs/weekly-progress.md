@@ -30,7 +30,7 @@ During implementation, new information that changes the decision must be recorde
 |---|---|---|---|
 | 1 | Created before this record format | [Week 1 review report](week-1-review-report.md) | Foundation - complete |
 | 2 | [Week 2 preview plan](week-2-preview-plan.md) | [Week 2 review report](week-2-review-report.md) | Document lifecycle - core milestone complete |
-| 3 | [Week 3 preview plan](week-3-preview-plan.md) | Pending | RAG strategy evaluation and baseline - planned |
+| 3 | [Week 3 preview plan](week-3-preview-plan.md) | [Week 3 RAG strategy selection report](week-3-rag-selection-report.md) | Reviewed 70-case matrix complete; C1+E1 selected for the production prototype |
 
 ## End-of-week review checklist
 

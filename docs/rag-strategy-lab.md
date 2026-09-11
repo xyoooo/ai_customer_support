@@ -1,9 +1,10 @@
 # SupportPilot RAG Strategy Lab
 
 - **Branch:** `codex/week3-rag-strategy-lab`
-- **Status:** Experiment framework implemented; reviewed dataset and measured runs pending
-- **Date:** July 22, 2026
+- **Status:** Reviewed 70-case matrix complete; C1+E1 selected for the production prototype
+- **Date:** September 10, 2026
 - **Related plan:** [Week 3 preview plan](week-3-preview-plan.md)
+- **Selection evidence:** [Week 3 RAG strategy selection report](week-3-rag-selection-report.md)
 - **Decision boundary:** [ADR 0006](adr/0006-lab-evaluation-and-single-rag-production-pipeline.md)
 
 ## 1. Purpose
@@ -21,18 +22,25 @@ The word **selected** means best for the current corpus, evaluation set, metrics
 
 ### Implemented lab layout
 
-- `packages/rag_lab/parsing.py`: canonical PDF, Markdown, HTML, and text parsing.
+- `packages/rag_lab/parsing.py`: canonical layout-aware PDF, Markdown, HTML, and text parsing.
 - `packages/rag_lab/chunking.py`: switchable C0, C1, and C2 implementations.
+- `packages/rag_lab/token_budget.py`: shared E0-E2 model-tokenizer budget validation.
 - `packages/rag_lab/embeddings.py`: pinned offline E0-E2 FastEmbed adapters and model-manifest checks.
 - `packages/rag_lab/retrieval.py`: exact dense, fixed lexical, and deterministic RRF reference/PostgreSQL retrieval.
 - `packages/rag_lab/dataset.py`: reviewed-dataset schema, reference validation, and strict 50-case coverage gates.
 - `packages/rag_lab/evaluation.py`: indexing, query execution, quality, citation, isolation, latency, and storage reporting.
 - `scripts/cache_rag_model.py`: explicit pinned model acquisition; normal runs never download models.
 - `scripts/run_rag_experiment.py`: one-profile execution with an immutable fingerprint.
+- `scripts/run_rag_matrix.py`: reusable corpus/model execution for a candidate matrix.
+- `scripts/summarize_rag_suite.py`: separate baseline and challenge summaries.
 - `scripts/compare_rag_experiments.py`: side-by-side evidence without automatic selection.
 - `experiments/rag/example`: synthetic smoke inputs only; not selection evidence.
 
-The real `week3-v1` 50-case dataset remains a human-review deliverable. The code rejects incomplete category/media coverage when `--strict-dataset` is enabled.
+The local `week3-apple-suite-v2-reviewed` dataset combines the stable 50-case baseline and
+20 reviewed challenge cases. The full local dataset, downloaded Apple corpus, and generated
+reports are excluded from Git. A source-free question/evidence manifest and corpus hashes are
+the reproducibility artifacts planned for transfer; raw Apple documents remain local. The
+code rejects incomplete baseline category/media coverage when `--strict-dataset` is enabled.
 
 ## 2. Branch boundary
 
@@ -67,7 +75,7 @@ The following inputs remain fixed while chunking and embedding candidates are co
 | Source content | Same immutable synthetic document versions and checksums |
 | Parsing | Same ordered canonical blocks and source locators |
 | Tenant scope | Same workspace and active-version filters with forced RLS |
-| Lexical retrieval | Same explicit PostgreSQL text-search configuration and ranking query |
+| Lexical retrieval | Same application-owned `bm25-structural-v1` scorer for in-memory and PostgreSQL runs |
 | Vector comparison | Exact cosine search; no approximate index during candidate selection |
 | Candidate counts | Same lexical and dense candidate limits |
 | Fusion | Same deterministic RRF constant and tie-breaking rule |
@@ -96,7 +104,7 @@ A parameter change creates a new profile ID. Results from two fingerprints must 
 
 ## 5. Chunking candidates for the initial experiment
 
-These candidates are in Week 3 scope. They are documented but not yet implemented.
+These candidates are implemented in the Week 3 lab.
 
 ### C0 - Fixed-token control
 
@@ -206,7 +214,7 @@ The adapter must reproduce the model's documented query prefix, pooling, and nor
 | Field | Value |
 |---|---|
 | Model | `jinaai/jina-embeddings-v2-small-en` |
-| Status | Planned for initial implementation |
+| Status | Implemented through the pinned offline adapter |
 | Dimension | 512 |
 | Role | Lightweight long-context comparison and future late-chunking path |
 | License to record | Apache-2.0 |
@@ -232,14 +240,13 @@ Every initial embedding adapter must pass:
 - Model loading never downloads implicitly during a normal offline evaluation run.
 - Raw document text and vectors are absent from general logs.
 
-The initial E0-E2 profiles use explicit model-tokenizer-aware right truncation when a
-chunk exceeds the candidate's declared input limit. The adapter preserves the beginning
-of the embedding input, including deterministic C2 context, records this policy in the
-profile fingerprint, and verifies the fitted text again with special tokens enabled before
-inference. Stored source text and citation spans remain unchanged. This policy is necessary
-because the lab's deterministic chunking tokenizer and each embedding model's subword
-tokenizer do not produce identical counts. Every report records the number of truncated
-document and query inputs so the manual selection can account for this trade-off.
+Normal E0-E2 profiles reject oversized embedding inputs. Before chunk finalization, the lab
+validates the proposed input against all three actual model tokenizers, including special
+tokens, document prefixes, and the full C2 title/heading context. C1 and C2 therefore retain
+identical source boundaries while fitting the strictest candidate. Oversized semantic pieces
+split deterministically at source-aligned token spans. Right truncation remains an adapter
+fallback for explicitly configured diagnostic profiles only; it is not used by the measured
+profiles. The September 2 matrix reported zero truncated inputs for all nine combinations.
 
 ## 7. Future chunking candidates
 
@@ -254,7 +261,7 @@ The following strategies are catalogued for later lab cycles. They are not Week 
 | FC7 | LLM-generated contextual chunks | Add document-specific context that headings cannot provide | C2 remains weak on context-dependent evidence | Prompt/model versioning, hallucination checks, source separation, cost and retry controls |
 | FC8 | Hierarchical/RAPTOR indexing | Retrieve leaf facts and higher-level summaries | Multi-section questions are a major measured category | Tree reproducibility, summary provenance, parent/child ranking, generation failures |
 | FC9 | Query-adaptive window expansion | Add neighboring context only for the current query | Static chunks trade precision against insufficient context | Query-time determinism, latency, expansion bounds, cache behavior, citation union |
-| FC10 | Layout and table-aware chunking | Preserve rows, columns, visual regions, and reading order | OCR/layout support enters scope and table questions fail | Layout fixtures, cell coordinates, reading-order tests, OCR confidence, image-only pages |
+| FC10 | Advanced table/OCR-aware chunking | Extend the implemented text-layout parser to preserve table cells and image-only pages | Table or scanned-document questions fail | Cell coordinates, table fixtures, OCR confidence, image-only pages |
 
 References for the catalogued approaches include [Late Chunking](https://arxiv.org/abs/2409.04701), [Dense X Retrieval](https://arxiv.org/abs/2312.06648), [RAPTOR](https://arxiv.org/abs/2401.18059), and [Contextual Retrieval](https://www.anthropic.com/engineering/contextual-retrieval). Their inclusion here records an evolution path, not a quality claim for SupportPilot.
 
@@ -325,6 +332,34 @@ The initial dataset contains 50 human-reviewed cases. Cases may carry multiple t
 The corpus must include PDF, Markdown, HTML, and text. Labels identify acceptable immutable document versions and source spans, not generated chunk IDs. A retrieved chunk is relevant when its locator contains or meaningfully overlaps an approved evidence span according to a versioned scoring rule.
 
 The dataset must not be used to train or tune an embedding model. Parameter choices informed by the dataset must be recorded, and final claims must acknowledge that the same small set influenced selection.
+
+### 10.1 Separate complex challenge set
+
+The reviewed `week3-apple-suite-v2-reviewed` dataset contains the stable 50-case baseline
+and a 20-case challenge group. The challenge group has 19 answerable cases and one
+false-premise unanswerable case. Fourteen challenge cases were corrected during human review
+to replace headings, fragments, irrelevant passages, and unsupported requirements with
+answer-supporting spans. The baseline cases were not changed.
+
+Challenge reporting adds evidence-span Recall@5, all-required-evidence Recall@5 and Recall@10,
+and citation coverage at both cutoffs. A query that retrieves one relevant passage but misses
+the remaining required passages is counted as partial, not complete.
+
+Human review follows the [Week 3 challenge-set review guide](week-3-challenge-review-guide.md).
+
+### 10.2 Lexical scorer calibration boundary
+
+The September 10 lexical revision replaces the reference word-frequency score and PostgreSQL
+all-terms query with one deterministic BM25 implementation. It removes common question words,
+keeps original and conservative suffix variants, preserves numeric and punctuation-bearing
+identifiers, applies corpus-level inverse-document frequency, rewards adjacent query terms,
+and includes trusted heading paths and document titles at lower weights than source text.
+
+For exact lab equivalence, the PostgreSQL adapter loads the tenant-scoped, active,
+profile-scoped chunks and applies the same application scorer. This is acceptable for the
+small evaluation corpus but is not the production scaling design. After a strategy is selected,
+the production branch must reproduce the approved ranking with a bounded SQL candidate query,
+stored statistics, or a proven BM25 extension before using a large corpus.
 
 ## 11. Test criteria
 
@@ -417,20 +452,41 @@ Before the lab result can be frozen and tagged:
 
 ## 13. Manual selection record
 
-The lab report must contain:
+The September 10 reviewed matrix executed every C0-C2 by E0-E2 combination over all 70
+cases with `bm25-structural-v1`, exact cosine search, deterministic RRF, top 10 results, zero
+embedding truncation, and zero cross-workspace results. The complete measurements and
+trade-off analysis are recorded in the
+[Week 3 RAG strategy selection report](week-3-rag-selection-report.md).
+
+**C1+E1 is selected.** C1 is structure-aware recursive chunking with a 350-token target,
+500-token hard maximum, approximately 60-token overlap, and heading, paragraph, sentence,
+then token fallback boundaries. E1 is the pinned 384-dimensional
+`snowflake/snowflake-arctic-embed-xs` adapter with its recorded query prefix, CLS pooling,
+normalization, revision, and Apache-2.0 license.
+
+C1+E1 achieved the highest overall Recall@5 (0.889), Complete@10 (0.810), Citation@5
+(0.808), and Citation@10 (0.871), while tying the best Complete@5 (0.714). C0+E1 remains
+the efficiency reference because it has fewer chunks, lower retrieval latency, and better
+MRR and nDCG@5. The selection accepts C1+E1's additional local storage and latency for
+better evidence completeness, citation coverage, and structure-preserving source units in
+the current personal, local-use deployment.
+
+The selection record is:
 
 ```yaml
-experiment_tag: rag-strategy-evaluation-v1
-evaluated_commit: <git-sha>
-dataset_version: week3-v1
-fixed_retrieval_config: <fingerprint>
-selected_candidate: <chunker-id>+<embedder-id>
-selected_profile_fingerprint: <sha256>
-decision_owner: <name-or-role>
-decision_date: <date>
+experiment_tag: rag-strategy-evaluation-v2-reviewed
+evaluated_commit: 8fcdba733b26301b9a1553fabf73d4a37b1effb0
+dataset_version: week3-apple-suite-v2-reviewed
+fixed_retrieval_config: bm25-structural-v1 + exact-cosine + rrf-60
+selected_candidate: C1+E1
+selected_profile_fingerprint: 430c6c3fbd841e744e3bc9b95a248fa4a5ef85ccc367e20744599ec2f45a9f7c
+decision_owner: project owner
+decision_date: 2026-09-10
 ```
 
-It must list all executed combinations, failed or skipped runs, exact metrics, important failure cases, accepted trade-offs, and the reason the selected combination best fits the current project.
+The evaluated commit is the frozen functional implementation used by all nine final reports.
+The immutable tag must point to the later evidence commit that records this decision. Raw corpus files, model
+weights, generated vectors, and raw result JSON remain excluded from Git.
 
 ## 14. Production-transfer equivalence tests
 

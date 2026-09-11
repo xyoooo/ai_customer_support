@@ -30,7 +30,7 @@ npm.cmd run check
 npm.cmd run check:api
 ```
 
-No AI provider, parser, embedding model, or retrieval dependency is included yet. Week 3 will add those capabilities behind the stable document, storage, and worker interfaces established in Week 2.
+The production application still ends at the Week 2 document lifecycle. This lab branch contains the measured RAG experiment implementation, but it is not wired into the production worker or API and will not be merged wholesale. The selected C1+E1 pipeline will be implemented separately behind the stable document, storage, and worker interfaces.
 
 ## Weekly progress
 
@@ -38,4 +38,4 @@ See the [weekly progress index](docs/weekly-progress.md) for the preview plan an
 
 Week 1's delivered scope and evidence are recorded in the [Week 1 review report](docs/week-1-review-report.md). The [Week 2 preview plan](docs/week-2-preview-plan.md) defines the document-lifecycle milestone, acceptance criteria, and handoff to the RAG baseline.
 
-The accepted [document lifecycle and durable-job ADR](docs/adr/0004-document-lifecycle-and-durable-jobs.md) defines the stable boundary for Week 2 implementation. The [Week 3 preview plan](docs/week-3-preview-plan.md) defines the lab-based chunking and embedding comparison, manual selection gate, and single-pipeline production milestone. [ADR 0006](docs/adr/0006-lab-evaluation-and-single-rag-production-pipeline.md) records why the lab branch is not merged and only the selected solution enters `main`. On the lab branch, the [RAG strategy lab specification](docs/rag-strategy-lab.md) catalogs current and future candidates and defines the experiment and test criteria.
+The accepted [document lifecycle and durable-job ADR](docs/adr/0004-document-lifecycle-and-durable-jobs.md) defines the stable boundary for Week 2 implementation. The [Week 3 preview plan](docs/week-3-preview-plan.md) defines the lab-based chunking and embedding comparison, manual selection gate, and single-pipeline production milestone. [ADR 0006](docs/adr/0006-lab-evaluation-and-single-rag-production-pipeline.md) records why the lab branch is not merged and only the selected solution enters `main`. The [RAG strategy lab specification](docs/rag-strategy-lab.md) defines the candidates and test criteria, the [selection report](docs/week-3-rag-selection-report.md) records the C1+E1 decision, and the [production handoff plan](docs/week-3-production-handoff.md) defines how to build the selected pipeline from clean `main`.

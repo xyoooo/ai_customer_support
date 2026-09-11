@@ -2,6 +2,10 @@
 
 This directory contains approved, non-production inputs for the switchable Week 3 lab. Generated reports and model caches are ignored by Git.
 
+The tracked `benchmarks/week3-apple-suite-v2-reviewed.manifest.json` records the immutable
+hash and provenance of the selected local benchmark without redistributing its questions,
+source text, downloaded PDFs, synthetic fixture bodies, or model files.
+
 ## Install the isolated lab dependencies
 
 ```powershell
@@ -43,4 +47,16 @@ uv run python scripts/compare_rag_experiments.py `
 ```
 
 The comparison records paired wins, ties, losses, quality, citations, and latency. It never selects a winner automatically.
+
+## Run and summarize a candidate matrix
+
+`scripts/run_rag_matrix.py` parses a shared corpus once and reuses each local embedding model
+across chunkers. `scripts/summarize_rag_suite.py` can then report stable baseline and separate
+challenge groups from the same immutable run. Normal profiles validate chunks against all
+candidate tokenizers and reject overflow; they do not silently truncate source content.
+
+The lab lexical branch uses the application-owned `bm25-structural-v1` scorer for both the
+in-memory and PostgreSQL adapters. The PostgreSQL path intentionally scores the complete
+tenant/profile-scoped active corpus for exact experiment parity; replace this with a bounded,
+equivalence-tested SQL candidate stage before production-scale use.
 

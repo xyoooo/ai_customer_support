@@ -1,0 +1,51 @@
+{
+  "schema_version": 1,
+  "dataset_version": "week3-apple-suite-v2-reviewed",
+  "dataset_file": "var/rag-evals/apple/week3-apple-suite-v2-reviewed.json",
+  "dataset_sha256": "0f3673ae1801470daa42534a05a71bbbb7658c83f28a4c84fb2b8a469aa0e5dd",
+  "case_count": 70,
+  "baseline_case_count": 50,
+  "challenge_case_count": 20,
+  "unanswerable_case_count": 1,
+  "review_status": "human-reviewed",
+  "content_policy": "This manifest contains identifiers, hashes, and public acquisition URLs only. The reviewed question/evidence dataset, source bodies, downloaded PDFs, and model files remain local and are not committed.",
+  "corpus": {
+    "local_manifest_file": "var/rag-corpus/apple/source-manifest.json",
+    "local_manifest_sha256": "0b3f6a68f6fe8d54c4d5ce7daf33571d6f926f8d8530374f1f8a21d7196e3650",
+    "documents": [
+      {
+        "file": "apple-platform-security-guide-2026-08.pdf",
+        "title": "Apple Platform Security",
+        "source_url": "https://help.apple.com/pdf/security/en_US/apple-platform-security-guide.pdf",
+        "sha256": "b52f68820c1ea891c34bba5b9f54ded6f1160fc72561d75fdf5c230c64f83e67"
+      },
+      {
+        "file": "personal-safety-user-guide-2026-03.pdf",
+        "title": "Apple Personal Safety User Guide",
+        "source_url": "https://help.apple.com/pdf/personal-safety/en_US/personal-safety-user-guide.pdf",
+        "sha256": "0a1165952d722aca2e057f503954f5305a6b0df1b88857f9656a93c19779de62"
+      },
+      {
+        "file": "tips-for-working-with-apple-devices-2020-07.pdf",
+        "title": "Tips for Working with Apple Devices",
+        "source_url": "https://support.apple.com/library/APPLE/APPLECARE_ALLGEOS/HT211111/Tips-for-Working-with-Apple-Devices-July-2020.pdf",
+        "sha256": "4df6538660bce2132f8e8c3935a78b776b32e6ea7580bf25a3291a5694b40601"
+      },
+      {
+        "file": "synthetic/platform-security-superseded.md",
+        "purpose": "inactive-version isolation fixture",
+        "sha256": "8d78f9e09c1657ddc2d5194559890613191e7944167756c6990c9dd8847be37b"
+      },
+      {
+        "file": "synthetic/personal-safety-superseded.html",
+        "purpose": "inactive-version isolation fixture",
+        "sha256": "80f81ce7585d2e43f4adab8848957d35d77f5f1f19f754ae30c95ce114e98277"
+      },
+      {
+        "file": "synthetic/private-workspace.txt",
+        "purpose": "cross-workspace isolation fixture",
+        "sha256": "49f568a61d443ba4abe29c2808ab44f44b91797348088fde3c7e60ec444254fb"
+      }
+    ]
+  }
+}

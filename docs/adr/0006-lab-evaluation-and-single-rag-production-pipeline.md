@@ -72,7 +72,9 @@ The lab branch will not merge into `main`. After selection:
 
 `main` will contain one versioned RAG pipeline and will not expose a customer, administrator, or runtime strategy switch. It will record the selected chunker parameters, embedding model revision, preprocessing, vector dimension, normalization, and pipeline version so derived data remains reproducible. A future strategy change creates a new pipeline version and explicit re-indexing work.
 
-The concise evaluation report and reviewed regression dataset enter `main`; alternative implementations, the experiment registry, candidate profiles, raw traces, model weights, caches, generated embeddings, and losing dependencies do not.
+The concise evaluation report and source-free benchmark manifest enter `main`; the local
+reviewed dataset, alternative implementations, experiment registry, candidate profiles,
+raw traces, model weights, caches, generated embeddings, and losing dependencies do not.
 
 ## Why this suits the current stage
 
@@ -113,3 +115,17 @@ Reconsider a permanent strategy/profile platform in `main` when one or more of t
 - The team grows and takes ownership of a maintained retrieval experimentation platform with dedicated compatibility and security tests.
 
 Until then, future comparisons run in a refreshed lab branch based on current `main`. Only a manually selected, independently validated, versioned pipeline is promoted into the production codebase.
+
+## Outcome of the initial evaluation
+
+On September 10, 2026, the project owner selected C1+E1 for the first production RAG
+pipeline after reviewing the corrected 70-case matrix. C1 is the structure-aware recursive
+chunker; E1 is the pinned 384-dimensional Snowflake Arctic Embed XS adapter. The fixed
+retrieval layer is the application-owned `bm25-structural-v1` lexical scorer, exact cosine
+dense retrieval, and deterministic RRF during equivalence validation.
+
+The lab branch remains non-mergeable. Production work will follow the
+[Week 3 production handoff plan](../week-3-production-handoff.md) on a clean
+`codex/week3-rag-production` branch created from current `main`. C0, C2, E0, E2, the
+candidate registry, mixed-dimension storage, strategy switches, and raw experiment output
+remain outside the production implementation.
