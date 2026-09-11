@@ -42,3 +42,7 @@ See the [weekly progress index](docs/weekly-progress.md) for the preview plan an
 Week 1's delivered scope and evidence are recorded in the [Week 1 review report](docs/week-1-review-report.md). The [Week 2 preview plan](docs/week-2-preview-plan.md) defines the document-lifecycle milestone, acceptance criteria, and handoff to the RAG baseline.
 
 The accepted [document lifecycle and durable-job ADR](docs/adr/0004-document-lifecycle-and-durable-jobs.md) defines the stable boundary for Week 2 implementation. The [Week 3 selection report](docs/week-3-rag-selection-report.md) records the full candidate result. [ADR 0006](docs/adr/0006-lab-evaluation-and-single-rag-production-pipeline.md) separates the lab from production, while [ADR 0007](docs/adr/0007-c1-e1-production-rag-pipeline.md) fixes C1+E1 as the only production pipeline.
+
+Week 3's final outcome is recorded in the [Week 3 review report](docs/week-3-review-report.md).
+The proposed [Week 4 preview plan](docs/week-4-preview-plan.md) defines the next grounded
+answer, citation, conversation, evaluation, and local account-recovery milestone.

@@ -31,6 +31,7 @@ During implementation, new information that changes the decision must be recorde
 | 1 | Created before this record format | [Week 1 review report](week-1-review-report.md) | Foundation - complete |
 | 2 | [Week 2 preview plan](week-2-preview-plan.md) | [Week 2 review report](week-2-review-report.md) | Document lifecycle - core milestone complete |
 | 3 | [Week 3 preview plan](week-3-preview-plan.md) | [Week 3 review report](week-3-review-report.md) | C1+E1 production RAG baseline - complete |
+| 4 | [Week 4 preview plan](week-4-preview-plan.md) | Not started | Grounded answer and conversation experience - planned |
 
 ## End-of-week review checklist
 

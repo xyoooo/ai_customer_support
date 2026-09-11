@@ -18,6 +18,10 @@ The lab branch remains historical experiment evidence and was not merged. C0, C2
 E2, candidate registries, mixed-dimension storage, raw datasets, PDFs, model files, and raw
 results are absent from production.
 
+The selected pipeline and its CI corrections are now on `main`. Commit `b57b267` added
+the production C1+E1 vertical slice, and commit `2575fed` corrected fresh-database pgvector
+bootstrap and added explicit pinned-model provisioning for CI and local setup.
+
 ## Delivered scope
 
 | Area | Delivered result |
@@ -60,7 +64,7 @@ and normalization also match selected profile fingerprint
 
 ## Validation evidence
 
-All final local gates passed:
+All final local gates and the post-merge GitHub workflow passed:
 
 - Ruff lint and format checks.
 - Strict mypy over `apps` and `packages`.
@@ -78,6 +82,31 @@ All final local gates passed:
 - One Chromium end-to-end test using the real local E1 model: registration, Markdown
   upload, worker indexing, active status, evidence search, source passage display, and
   document job inspection.
+- GitHub CI run 35 passed backend, frontend, frontend-security, contracts, containers, and
+  the real-model end-to-end job on `main`.
+
+The first post-merge workflow exposed a clean-environment gap that local state had masked:
+the test database did not have the pgvector extension. The bootstrap now installs pgvector
+in both application and test databases, and the complete backend suite was repeated against
+a disposable fresh Linux database. Unblocking that job would also have exposed an empty E1
+model mount in the end-to-end runner, so the pinned revision is now provisioned explicitly
+and cached before containers start. Runtime model downloads remain disabled.
+
+## Demo-ready scope
+
+The current prototype supports a complete evidence-retrieval demonstration:
+
+1. Register an owner and create an isolated workspace.
+2. Upload a PDF, Markdown, HTML, or plain-text support document.
+3. Observe queued processing, worker indexing, immutable version activation, and the
+   completed durable job.
+4. Ask a question and inspect ranked passages with document, page or heading context, and
+   dense/lexical retrieval ranks.
+5. Demonstrate that another workspace cannot enumerate or retrieve the first workspace's
+   documents or chunks.
+
+This is deliberately an evidence-search demo, not yet a generated-answer or conversational
+assistant demo. The maintained walkthrough is in [the demo script](demo-script.md).
 
 ## Deviations and accepted trade-offs
 
@@ -103,6 +132,9 @@ the upstream FastAPI/Starlette testing path stabilizes.
   retrieval alone should not decide whether to answer.
 - Generated-answer faithfulness, citation completeness, clarification, abstention,
   conversation history, and human handoff remain Week 4 work.
+- Passwords are correctly stored only as one-way hashes, but there is no authenticated
+  password-change screen or safe local recovery command yet. Add both before relying on a
+  long-lived personal account; defer email-based recovery while deployment remains local.
 - A production malware scanner, DLP/PII controls, audit events, dedicated worker principal,
   secret management, retention policy, backup validation, and rate limits remain required
   before real customer data or public deployment.

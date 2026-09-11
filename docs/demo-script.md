@@ -1,14 +1,65 @@
-# Week 2 demo script
+# Week 3 evidence-retrieval demo
 
-1. Run `docker compose up --build` from a clean checkout.
-2. Open `http://localhost:5173/register` and create Workspace A.
-3. Open a private browser window, register a second account and Workspace B.
-4. Use the API documentation at `http://localhost:8000/docs` to add the second account to Workspace A as a viewer.
-5. Sign in as the viewer and show that members can be read but membership changes return `403`.
-6. Attempt to request Workspace B with Workspace A's owner token and show the non-enumerating `404` response.
-7. As the owner, upload a small synthetic Markdown document and show its queued state.
-8. Wait for the worker to activate the immutable version, then open the document page and show version metadata and the completed durable job.
-9. Explain the upload controls: streaming byte limit, filename sanitization, type/signature agreement, SHA-256 duplicate detection, application-generated object keys, and the development-only no-op scanner.
-10. Show migration `20260716_0002`, forced RLS on `documents`, `document_versions`, and `jobs`, and the expired-lease/stale-worker tests.
-11. Run `uv run pytest --cov=apps --cov=packages` and show the 85% coverage gate, direct cross-workspace denial, durable retry/dead-letter behavior, and migration preservation test.
-12. Show ADR 0004 and the Week 2 threat-model limitations, especially synthetic/public data only and the future dedicated worker credential and malware scanner.
+## Demo claim
+
+SupportPilot can securely ingest a support document into an isolated workspace and return
+ranked, source-located evidence through the selected production C1+E1 pipeline. It does not
+yet generate a conversational answer; that is the Week 4 milestone.
+
+## Preparation
+
+1. Use only synthetic or public documents.
+2. From the repository root, provision the pinned offline model:
+
+   ```powershell
+   uv run python scripts/cache_rag_model.py
+   ```
+
+3. Start the application:
+
+   ```powershell
+   docker compose up --build
+   ```
+
+4. Open `http://localhost:5173/register`.
+
+## Primary walkthrough
+
+1. Register a new owner and workspace.
+2. Create and upload a short Markdown support guide containing several policies, such as:
+   returns are accepted for 30 days, damaged items require photographs, and refunds return
+   to the original payment method.
+3. Show the document first entering its processing state, then becoming `active` only after
+   the worker completes parsing, chunking, embedding, and atomic persistence.
+4. Ask: `How long are returns accepted?`
+5. Show the returned source passage and its document, heading or page locator, and
+   dense/lexical rank details.
+6. Ask a paraphrase such as: `What proof should I provide for an item that arrived broken?`
+   Show that semantic and lexical retrieval can find the relevant policy without exact
+   wording.
+7. Open the document page and show the immutable active version and completed durable job.
+
+## Optional isolation walkthrough
+
+1. Register a second account in a private browser window and create a different workspace.
+2. Show that the second workspace cannot list, open, or retrieve evidence from the first
+   workspace's document.
+3. Explain that API authorization is backed by forced PostgreSQL row-level security rather
+   than UI filtering alone.
+
+## Evidence to mention
+
+- C1 structure-aware chunks and pinned E1 384-dimensional embeddings were selected from a
+  reviewed 70-case experiment rather than chosen by assumption.
+- Indexing is idempotent and activates a version only after its full chunk set is ready.
+- Search combines exact cosine retrieval, structural BM25, and deterministic reciprocal-rank
+  fusion.
+- Model files and uploaded documents are intentionally excluded from Git.
+- The final GitHub workflow validates backend, frontend, security, contracts, containers,
+  and the same real-model browser journey.
+
+## Honest boundary
+
+Do not present the displayed passages as a finished customer-support answer. Generated
+answers, validated citations, clarification, abstention, conversation history, and account
+recovery are planned for Week 4.
