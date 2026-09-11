@@ -13,6 +13,8 @@ from packages.database.models import User, WorkspaceMembership
 from packages.database.session import get_db_session
 from packages.database.tenant import set_tenant_context
 from packages.domain.enums import WorkspaceRole
+from packages.domain.errors import RetrievalUnavailableError
+from packages.rag.service import RetrievalService, get_retrieval_service
 from packages.security.rbac import role_is_allowed
 from packages.security.tokens import TokenError, decode_access_token
 from packages.storage import LocalObjectStore, MalwareScanner, NoopMalwareScanner, ObjectStore
@@ -41,6 +43,19 @@ def get_malware_scanner() -> MalwareScanner:
 
 ObjectStoreDependency = Annotated[ObjectStore, Depends(get_object_store)]
 MalwareScannerDependency = Annotated[MalwareScanner, Depends(get_malware_scanner)]
+
+
+def get_rag_service(settings: AppSettings) -> RetrievalService:
+    try:
+        return get_retrieval_service(
+            str(settings.rag_model_path),
+            settings.rag_embedding_threads,
+        )
+    except RuntimeError as exc:
+        raise RetrievalUnavailableError("the retrieval model is unavailable") from exc
+
+
+RAGServiceDependency = Annotated[RetrievalService, Depends(get_rag_service)]
 
 
 @dataclass(frozen=True)

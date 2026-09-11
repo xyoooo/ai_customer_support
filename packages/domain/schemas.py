@@ -159,6 +159,45 @@ class DocumentUploadResponse(BaseModel):
     job: JobResponse
 
 
+class EvidenceSearchRequest(BaseModel):
+    query: str = Field(min_length=1, max_length=10_000)
+    result_count: int = Field(default=5, ge=1, le=10)
+
+    @field_validator("query")
+    @classmethod
+    def strip_query(cls, value: str) -> str:
+        value = value.strip()
+        if not value:
+            raise ValueError("query cannot be blank")
+        return value
+
+
+class EvidenceLocatorResponse(BaseModel):
+    block_id: str
+    block_index: int
+    char_start: int
+    char_end: int
+    page_number: int | None
+
+
+class EvidenceResultResponse(BaseModel):
+    rank: int
+    document_id: UUID
+    version_id: UUID
+    text: str
+    heading_path: list[str]
+    page_number: int | None
+    locators: list[EvidenceLocatorResponse]
+    fused_score: float
+    dense_rank: int | None
+    lexical_rank: int | None
+
+
+class EvidenceSearchResponse(BaseModel):
+    pipeline_version: str
+    results: list[EvidenceResultResponse]
+
+
 class ErrorResponse(BaseModel):
     code: str
     message: str

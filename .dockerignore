@@ -9,5 +9,5 @@ __pycache__
 .ruff_cache
 tests
 docs
+var
 PROJECT_PROPOSAL.md
-

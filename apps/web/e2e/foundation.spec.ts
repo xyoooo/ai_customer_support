@@ -1,6 +1,7 @@
 import { expect, test } from "@playwright/test";
 
 test("owner can register and open the isolated workspace", async ({ page }) => {
+  test.setTimeout(90_000);
   const suffix = Date.now().toString();
   await page.goto("/register");
   await page.getByLabel("Display name").fill("Demo Owner");
@@ -25,7 +26,12 @@ test("owner can register and open the isolated workspace", async ({ page }) => {
   await page.getByRole("button", { name: "Upload document" }).click();
   const documentLink = page.getByRole("link", { name: /Synthetic support guide/ });
   await expect(documentLink).toBeVisible();
-  await expect(documentLink.getByText("active")).toBeVisible({ timeout: 15_000 });
+  await expect(documentLink.getByText("active")).toBeVisible({ timeout: 60_000 });
+  await page.getByLabel("Question").fill("How long are returns accepted?");
+  await page.getByRole("button", { name: "Search evidence" }).click();
+  await expect(page.getByText(/Returns are accepted for 30 days/)).toBeVisible({
+    timeout: 30_000,
+  });
   await documentLink.click();
   await expect(page.getByRole("heading", { name: "Synthetic support guide" })).toBeVisible();
   await expect(page.getByText("Version 1")).toBeVisible();

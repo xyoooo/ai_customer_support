@@ -36,6 +36,10 @@ class Settings(BaseSettings):
     secure_cookies: bool = False
     refresh_cookie_name: str = "supportpilot_refresh"
     object_store_root: Path = Path("var/objects")
+    rag_model_path: Path = Path("var/rag-model-cache/E1")
+    rag_embedding_threads: int | None = Field(default=None, ge=1, le=64)
+    rag_embedding_batch_size: int = Field(default=32, ge=1, le=256)
+    rag_max_query_characters: int = Field(default=2000, ge=32, le=10000)
     max_upload_bytes: int = Field(default=10 * 1024 * 1024, ge=1024, le=100 * 1024 * 1024)
     max_workspace_storage_bytes: int = Field(
         default=100 * 1024 * 1024, ge=1024, le=10 * 1024 * 1024 * 1024

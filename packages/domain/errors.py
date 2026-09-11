@@ -37,3 +37,13 @@ class UploadRejectedError(DomainError):
 class UploadTooLargeError(DomainError):
     status_code = 413
     code = "upload_too_large"
+
+
+class RetrievalUnavailableError(DomainError):
+    status_code = 503
+    code = "retrieval_unavailable"
+
+
+class InvalidQueryError(DomainError):
+    status_code = 422
+    code = "invalid_query"

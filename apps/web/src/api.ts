@@ -4,6 +4,7 @@ import type {
   DocumentDetail,
   DocumentSummary,
   DocumentUpload,
+  EvidenceSearch,
   Job,
   Membership,
   RegisterRequest,
@@ -178,6 +179,12 @@ export const api = {
     request<void>(
       `/workspaces/${workspaceId}/documents/${documentId}`,
       { method: "DELETE" },
+      token,
+    ),
+  searchEvidence: (token: string, workspaceId: string, query: string) =>
+    request<EvidenceSearch>(
+      `/workspaces/${workspaceId}/evidence/search`,
+      { method: "POST", body: JSON.stringify({ query, result_count: 5 }) },
       token,
     ),
 };

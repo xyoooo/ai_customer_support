@@ -3,6 +3,7 @@ from __future__ import annotations
 from datetime import datetime
 from uuid import UUID, uuid4
 
+from pgvector.sqlalchemy import Vector
 from sqlalchemy import (
     JSON,
     BigInteger,
@@ -176,6 +177,33 @@ class DocumentVersion(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     )
 
     document: Mapped[Document] = relationship(back_populates="versions", foreign_keys=[document_id])
+
+
+class DocumentChunk(Base):
+    __tablename__ = "document_chunks"
+
+    chunk_id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    workspace_id: Mapped[UUID] = mapped_column(
+        ForeignKey("workspaces.id", ondelete="CASCADE"), nullable=False
+    )
+    document_id: Mapped[UUID] = mapped_column(
+        ForeignKey("documents.id", ondelete="CASCADE"), nullable=False
+    )
+    version_id: Mapped[UUID] = mapped_column(
+        ForeignKey("document_versions.id", ondelete="CASCADE"), nullable=False
+    )
+    pipeline_version: Mapped[str] = mapped_column(String(64), nullable=False)
+    chunk_order: Mapped[int] = mapped_column(Integer, nullable=False)
+    original_text: Mapped[str] = mapped_column(Text, nullable=False)
+    token_count: Mapped[int] = mapped_column(Integer, nullable=False)
+    locators: Mapped[list[dict[str, int | str | None]]] = mapped_column(JSON, nullable=False)
+    heading_path: Mapped[list[str]] = mapped_column(JSON, nullable=False)
+    page_number: Mapped[int | None] = mapped_column(Integer)
+    document_title: Mapped[str] = mapped_column(String(255), nullable=False)
+    embedding: Mapped[list[float]] = mapped_column(Vector(384), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
 
 
 class Job(UUIDPrimaryKeyMixin, TimestampMixin, Base):

@@ -190,6 +190,28 @@ def test_document_tables_block_direct_cross_workspace_access(client: TestClient,
                 ).fetchall()
                 == []
             )
+            zero_vector = "[" + ",".join("0" for _ in range(384)) + "]"
+            with pytest.raises(psycopg.errors.RaiseException), connection.transaction():
+                connection.execute(
+                    """
+                    INSERT INTO document_chunks (
+                        chunk_id, workspace_id, document_id, version_id, pipeline_version,
+                        chunk_order, original_text, token_count, locators, heading_path,
+                        document_title, embedding
+                    ) VALUES (
+                        %s, %s, %s, %s, 'rag-v1-c1-e1', 0, 'blocked', 1,
+                        '[{"block_id":"b0","block_index":0,"char_start":0,"char_end":7,
+                        "page_number":null}]'::jsonb, '[]'::jsonb, 'Blocked', %s::vector
+                    )
+                    """,
+                    (
+                        "f" * 64,
+                        str(workspace_a["id"]),
+                        str(upload_b["document"]["id"]),
+                        str(upload_b["version"]["id"]),
+                        zero_vector,
+                    ),
+                )
         assert upload_a["document"]["id"] != upload_b["document"]["id"]
     finally:
         app.dependency_overrides.pop(get_object_store, None)

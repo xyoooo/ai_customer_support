@@ -17,6 +17,10 @@ flowchart LR
     Worker["Durable document worker"] --> Documents
     Worker --> Store
     Worker --> DB
+    Worker --> RAG["Canonical parser + C1 + E1"]
+    RAG --> DB
+    API --> Retrieval["Hybrid evidence retrieval"]
+    Retrieval --> DB
 ```
 
 The database uses separate migration and application roles. Tenant context is set with transaction-local PostgreSQL settings, and RLS policies constrain tenant-owned tables. Future document, job, conversation, and evaluation tables must use the same `workspace_id` and RLS convention.
@@ -24,3 +28,10 @@ The database uses separate migration and application roles. Tenant context is se
 The Week 2 document, storage, and worker boundaries are fixed in [ADR 0004](../adr/0004-document-lifecycle-and-durable-jobs.md). Logical documents point to immutable versions, while a worker activates a version only after verifying its stored object. Domain services store application-owned object keys and durable job identifiers; vendor storage responses and process-local task state do not cross those boundaries.
 
 The local worker claims bounded job batches with PostgreSQL leases and `FOR UPDATE SKIP LOCKED`. Queue discovery uses a transaction-local worker context; each processing transaction then sets the authoritative workspace from the claimed job before touching documents or versions. A dedicated worker database credential remains a future hardening improvement.
+
+The Week 3 production path is fixed as `rag-v1-c1-e1`. The worker validates each immutable
+object, parses it into citation-ready blocks, creates C1 structure-aware chunks, embeds them
+with the pinned local E1 model, and atomically activates the version only after all chunks
+are stored. Evidence search combines tenant-filtered exact cosine retrieval with structural
+BM25 and deterministic reciprocal-rank fusion. [ADR 0007](../adr/0007-c1-e1-production-rag-pipeline.md)
+records the complete contract and its reconsideration triggers.

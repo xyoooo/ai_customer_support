@@ -196,6 +196,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/workspaces/{workspace_id}/evidence/search": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Search Evidence */
+        post: operations["search_evidence_api_v1_workspaces__workspace_id__evidence_search_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/workspaces/{workspace_id}/jobs/{job_id}/retry": {
         parameters: {
             query?: never;
@@ -399,6 +416,65 @@ export interface components {
          * @enum {string}
          */
         DocumentVersionStatus: "queued" | "processing" | "active" | "failed";
+        /** EvidenceLocatorResponse */
+        EvidenceLocatorResponse: {
+            /** Block Id */
+            block_id: string;
+            /** Block Index */
+            block_index: number;
+            /** Char End */
+            char_end: number;
+            /** Char Start */
+            char_start: number;
+            /** Page Number */
+            page_number: number | null;
+        };
+        /** EvidenceResultResponse */
+        EvidenceResultResponse: {
+            /** Dense Rank */
+            dense_rank: number | null;
+            /**
+             * Document Id
+             * Format: uuid
+             */
+            document_id: string;
+            /** Fused Score */
+            fused_score: number;
+            /** Heading Path */
+            heading_path: string[];
+            /** Lexical Rank */
+            lexical_rank: number | null;
+            /** Locators */
+            locators: components["schemas"]["EvidenceLocatorResponse"][];
+            /** Page Number */
+            page_number: number | null;
+            /** Rank */
+            rank: number;
+            /** Text */
+            text: string;
+            /**
+             * Version Id
+             * Format: uuid
+             */
+            version_id: string;
+        };
+        /** EvidenceSearchRequest */
+        EvidenceSearchRequest: {
+            /** Query */
+            query: string;
+            /**
+             * Result Count
+             * @default 5
+             */
+            result_count: number;
+        };
+        /** EvidenceSearchResponse */
+        EvidenceSearchResponse: {
+            /** Pipeline Version */
+            pipeline_version: string;
+            /** Results */
+            results: components["schemas"]["EvidenceResultResponse"][];
+        };
         /** HTTPValidationError */
         HTTPValidationError: {
             /** Detail */
@@ -1059,6 +1135,41 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["DocumentUploadResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    search_evidence_api_v1_workspaces__workspace_id__evidence_search_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                workspace_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EvidenceSearchRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EvidenceSearchResponse"];
                 };
             };
             /** @description Validation Error */

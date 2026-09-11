@@ -12,6 +12,7 @@ export type DocumentSummary = components["schemas"]["DocumentResponse"];
 export type DocumentDetail = components["schemas"]["DocumentDetailResponse"];
 export type DocumentUpload = components["schemas"]["DocumentUploadResponse"];
 export type Job = components["schemas"]["JobResponse"];
+export type EvidenceSearch = components["schemas"]["EvidenceSearchResponse"];
 
 export interface ApiErrorBody {
   code?: string;

@@ -12,6 +12,7 @@ ADRs record an important technical choice, why it fits the product now, which li
 | [0004](0004-document-lifecycle-and-durable-jobs.md) | Use immutable document versions, portable object storage, and durable jobs | Accepted |
 | [0005](0005-postgresql-and-pgvector.md) | Use PostgreSQL with pgvector as the primary data and retrieval store | Accepted |
 | [0006](0006-lab-evaluation-and-single-rag-production-pipeline.md) | Evaluate RAG strategies in a lab branch and productionize one selected pipeline | Accepted |
+| [0007](0007-c1-e1-production-rag-pipeline.md) | Use C1+E1 as the single versioned production RAG pipeline | Accepted |
 
 ## Required structure
 

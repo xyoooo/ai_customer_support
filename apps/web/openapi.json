@@ -343,6 +343,176 @@
         "title": "DocumentVersionStatus",
         "type": "string"
       },
+      "EvidenceLocatorResponse": {
+        "properties": {
+          "block_id": {
+            "title": "Block Id",
+            "type": "string"
+          },
+          "block_index": {
+            "title": "Block Index",
+            "type": "integer"
+          },
+          "char_end": {
+            "title": "Char End",
+            "type": "integer"
+          },
+          "char_start": {
+            "title": "Char Start",
+            "type": "integer"
+          },
+          "page_number": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Page Number"
+          }
+        },
+        "required": [
+          "block_id",
+          "block_index",
+          "char_start",
+          "char_end",
+          "page_number"
+        ],
+        "title": "EvidenceLocatorResponse",
+        "type": "object"
+      },
+      "EvidenceResultResponse": {
+        "properties": {
+          "dense_rank": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dense Rank"
+          },
+          "document_id": {
+            "format": "uuid",
+            "title": "Document Id",
+            "type": "string"
+          },
+          "fused_score": {
+            "title": "Fused Score",
+            "type": "number"
+          },
+          "heading_path": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Heading Path",
+            "type": "array"
+          },
+          "lexical_rank": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lexical Rank"
+          },
+          "locators": {
+            "items": {
+              "$ref": "#/components/schemas/EvidenceLocatorResponse"
+            },
+            "title": "Locators",
+            "type": "array"
+          },
+          "page_number": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Page Number"
+          },
+          "rank": {
+            "title": "Rank",
+            "type": "integer"
+          },
+          "text": {
+            "title": "Text",
+            "type": "string"
+          },
+          "version_id": {
+            "format": "uuid",
+            "title": "Version Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "rank",
+          "document_id",
+          "version_id",
+          "text",
+          "heading_path",
+          "page_number",
+          "locators",
+          "fused_score",
+          "dense_rank",
+          "lexical_rank"
+        ],
+        "title": "EvidenceResultResponse",
+        "type": "object"
+      },
+      "EvidenceSearchRequest": {
+        "properties": {
+          "query": {
+            "maxLength": 10000,
+            "minLength": 1,
+            "title": "Query",
+            "type": "string"
+          },
+          "result_count": {
+            "default": 5,
+            "maximum": 10.0,
+            "minimum": 1.0,
+            "title": "Result Count",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "query"
+        ],
+        "title": "EvidenceSearchRequest",
+        "type": "object"
+      },
+      "EvidenceSearchResponse": {
+        "properties": {
+          "pipeline_version": {
+            "title": "Pipeline Version",
+            "type": "string"
+          },
+          "results": {
+            "items": {
+              "$ref": "#/components/schemas/EvidenceResultResponse"
+            },
+            "title": "Results",
+            "type": "array"
+          }
+        },
+        "required": [
+          "pipeline_version",
+          "results"
+        ],
+        "title": "EvidenceSearchResponse",
+        "type": "object"
+      },
       "HTTPValidationError": {
         "properties": {
           "detail": {
@@ -1500,6 +1670,64 @@
         "summary": "Create Document Version",
         "tags": [
           "documents"
+        ]
+      }
+    },
+    "/api/v1/workspaces/{workspace_id}/evidence/search": {
+      "post": {
+        "operationId": "search_evidence_api_v1_workspaces__workspace_id__evidence_search_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "workspace_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Workspace Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EvidenceSearchRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EvidenceSearchResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Search Evidence",
+        "tags": [
+          "retrieval"
         ]
       }
     },

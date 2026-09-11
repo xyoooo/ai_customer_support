@@ -13,9 +13,36 @@ from packages.database.session import get_session_factory
 from packages.database.tenant import set_worker_context
 from packages.domain.errors import ConflictError
 from packages.jobs.service import claim_jobs, mark_completed, mark_failed
+from packages.rag.chunking import StructureAwareChunker
+from packages.rag.parsing import CanonicalParser
+from packages.rag.service import RAGIndexer
 from packages.storage.local import LocalObjectStore
 
 pytestmark = pytest.mark.integration
+
+
+class TestBudget:
+    def fits(self, text: str) -> bool:
+        return bool(text.strip())
+
+    def assert_fits(self, text: str) -> None:
+        assert self.fits(text)
+
+
+class TestEmbedder:
+    def embed_documents(self, texts):  # type: ignore[no-untyped-def]
+        return tuple((1.0,) * 384 for _ in texts)
+
+    def embed_queries(self, texts):  # type: ignore[no-untyped-def]
+        return tuple((1.0,) * 384 for _ in texts)
+
+
+TEST_INDEXER = RAGIndexer(
+    parser=CanonicalParser(),
+    chunker=StructureAwareChunker(TestBudget()),
+    embedder=TestEmbedder(),
+    batch_size=2,
+)
 
 
 def setup_upload(client: TestClient, tmp_path: Path, suffix: str):  # type: ignore[no-untyped-def]
@@ -92,7 +119,7 @@ def test_worker_claim_is_exclusive_and_processing_activates_version(
         other_claim = client.portal.call(claim_one, "worker-two")
         assert other_claim == []
 
-        client.portal.call(process_job, claimed[0], "worker-one", store)
+        client.portal.call(process_job, claimed[0], "worker-one", store, TEST_INDEXER)
         detail = client.get(
             f"/api/v1/workspaces/{workspace_id}/documents/{uploaded['document']['id']}",
             headers=headers,
