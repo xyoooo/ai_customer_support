@@ -106,8 +106,9 @@ the upstream FastAPI/Starlette testing path stabilizes.
 - A production malware scanner, DLP/PII controls, audit events, dedicated worker principal,
   secret management, retention policy, backup validation, and rate limits remain required
   before real customer data or public deployment.
-- E1 requires an approximately 385.6 MiB ignored local model cache. Provisioning is manual
-  for this personal local deployment.
+- E1 requires an approximately 385.6 MiB ignored local model cache. The explicit
+  `scripts/cache_rag_model.py` setup command provisions the pinned revision locally and CI
+  caches it; application runtime remains offline-only.
 
 ## Week 4 handoff
 

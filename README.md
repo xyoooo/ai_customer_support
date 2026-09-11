@@ -31,7 +31,8 @@ npm.cmd run check:api
 ```
 
 Before starting the worker, provision the pinned E1 model files under
-`var/rag-model-cache/E1`; this directory is intentionally excluded from Git. The runtime
+`var/rag-model-cache/E1` with `uv run python scripts/cache_rag_model.py`; this directory is
+intentionally excluded from Git. Provisioning is an explicit setup/CI step. The runtime
 does not download model files or silently truncate inputs.
 
 ## Weekly progress

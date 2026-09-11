@@ -111,6 +111,18 @@ jobs:
           node-version: 24
           cache: npm
           cache-dependency-path: apps/web/package-lock.json
+      - uses: astral-sh/setup-uv@v7
+        with:
+          version: "0.11.28"
+          enable-cache: true
+      - run: uv python install 3.12
+      - run: uv sync --frozen --no-dev
+      - uses: actions/cache@v4
+        with:
+          path: var/rag-model-cache/E1
+          key: rag-e1-${{ runner.os }}-${{ hashFiles('packages/rag/config.py', 'scripts/cache_rag_model.py') }}
+      - name: Provision pinned E1 model
+        run: uv run python scripts/cache_rag_model.py
       - run: npm ci
         working-directory: apps/web
       - run: npx playwright install --with-deps chromium
