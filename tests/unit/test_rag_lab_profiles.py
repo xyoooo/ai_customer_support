@@ -81,6 +81,12 @@ def test_candidate_spec_validation_rejects_ambiguous_profiles() -> None:
         RetrievalSpec(distance="euclidean")
     with pytest.raises(ValueError, match="english"):
         RetrievalSpec(lexical_config="simple")
+    with pytest.raises(ValueError, match="lexical scorer"):
+        RetrievalSpec(lexical_scorer="word-count-v0")
+    with pytest.raises(ValueError, match="BM25"):
+        RetrievalSpec(bm25_b=1.1)
+    with pytest.raises(ValueError, match="weights"):
+        RetrievalSpec(heading_weight=-1)
 
 
 def test_canonical_locators_resolve_and_fail_closed() -> None:

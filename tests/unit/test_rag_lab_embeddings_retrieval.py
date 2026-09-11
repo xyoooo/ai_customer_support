@@ -11,6 +11,7 @@ from packages.rag_lab.embeddings import (
     FastEmbedAdapter,
     LocalModelManifest,
 )
+from packages.rag_lab.lexical import BM25LexicalScorer, lexical_terms
 from packages.rag_lab.models import Chunk, IndexedChunk, SourceLocator
 from packages.rag_lab.profiles import EmbeddingSpec, RetrievalSpec
 from packages.rag_lab.retrieval import InMemoryHybridIndex
@@ -33,7 +34,14 @@ def _embedding_spec(*, dimension: int = 16, input_limit: int = 30) -> EmbeddingS
     )
 
 
-def _chunk(chunk_id: str, text: str, *, version_id: str = "version") -> Chunk:
+def _chunk(
+    chunk_id: str,
+    text: str,
+    *,
+    version_id: str = "version",
+    heading_path: tuple[str, ...] = (),
+    document_title: str = "",
+) -> Chunk:
     return Chunk(
         chunk_id=chunk_id,
         document_id="document",
@@ -43,8 +51,9 @@ def _chunk(chunk_id: str, text: str, *, version_id: str = "version") -> Chunk:
         embedding_text=text,
         token_count=len(text.split()),
         locators=(SourceLocator("b000000", 0, 0, len(text)),),
-        heading_path=(),
+        heading_path=heading_path,
         page_number=None,
+        document_title=document_title,
     )
 
 
@@ -193,3 +202,42 @@ def test_hybrid_index_rejects_invalid_scope_queries_and_vectors() -> None:
             query="refund",
             query_embedding=(1.0,),
         )
+
+
+def test_bm25_ignores_question_noise_and_rewards_rare_terms() -> None:
+    scorer = BM25LexicalScorer(RetrievalSpec())
+    relevant = _chunk(
+        "a" * 64,
+        "Emergency Reset immediately stops digital sharing.",
+        heading_path=("Safety Check", "Emergency Reset"),
+        document_title="Apple Personal Safety User Guide",
+    )
+    noisy = _chunk(
+        "b" * 64,
+        "Apple devices provide information and settings for a person using a device.",
+        document_title="Apple Device Guide",
+    )
+
+    ranked = scorer.rank(
+        "I have an Apple device. What should I use to stop all sharing immediately?",
+        (noisy, relevant),
+        limit=2,
+    )
+
+    assert ranked == (relevant, noisy)
+    assert "what" not in lexical_terms("What should I use?")
+    assert set(lexical_terms("sharing")) & set(lexical_terms("share"))
+
+
+def test_bm25_preserves_identifiers_and_uses_trusted_structure() -> None:
+    scorer = BM25LexicalScorer(RetrievalSpec())
+    identifier = _chunk("a" * 64, "Use recovery code RET-30 for this request.")
+    unrelated = _chunk("b" * 64, "Use recovery code RET-31 for this request.")
+    structural = _chunk(
+        "c" * 64,
+        "Review the people and applications listed here.",
+        heading_path=("Safety Check", "Manage Sharing and Access"),
+    )
+
+    assert scorer.rank("Where is RET-30?", (unrelated, identifier), limit=1) == (identifier,)
+    assert scorer.rank("Manage sharing access", (identifier, structural), limit=1) == (structural,)

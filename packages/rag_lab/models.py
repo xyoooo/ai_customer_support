@@ -112,6 +112,7 @@ class Chunk:
     locators: tuple[SourceLocator, ...]
     heading_path: tuple[str, ...]
     page_number: int | None
+    document_title: str = ""
 
     def __post_init__(self) -> None:
         if not self.chunk_id or not self.document_id or not self.version_id:
@@ -138,6 +139,7 @@ class Chunk:
         locators: tuple[SourceLocator, ...],
         heading_path: tuple[str, ...],
         page_number: int | None,
+        document_title: str = "",
     ) -> Chunk:
         identity = {
             "document_id": document_id,
@@ -159,6 +161,7 @@ class Chunk:
             locators=locators,
             heading_path=heading_path,
             page_number=page_number,
+            document_title=document_title,
         )
 
     def as_storage_dict(self) -> dict[str, Any]:
@@ -173,6 +176,7 @@ class Chunk:
             "locators": [locator.as_dict() for locator in self.locators],
             "heading_path": list(self.heading_path),
             "page_number": self.page_number,
+            "document_title": self.document_title,
         }
 
 

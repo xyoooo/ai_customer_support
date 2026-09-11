@@ -33,6 +33,7 @@ dev = [
 ]
 rag-lab = [
   "fastembed==0.8.0",
+  "pdfplumber==0.11.10",
   "pgvector==0.5.0",
   "pypdf==6.14.2",
 ]

@@ -58,6 +58,13 @@ class EmbeddingSpec:
 class RetrievalSpec:
     distance: str = "cosine"
     lexical_config: str = "english"
+    lexical_scorer: str = "bm25-structural-v1"
+    bm25_k1: float = 1.2
+    bm25_b: float = 0.75
+    heading_weight: float = 0.75
+    title_weight: float = 0.5
+    exact_identifier_bonus: float = 1.5
+    phrase_bonus: float = 0.25
     lexical_candidates: int = 20
     dense_candidates: int = 20
     rrf_constant: int = 60
@@ -69,6 +76,20 @@ class RetrievalSpec:
             raise ValueError("the initial lab supports exact cosine distance only")
         if self.lexical_config != "english":
             raise ValueError("the initial lab fixes PostgreSQL lexical retrieval to english")
+        if self.lexical_scorer != "bm25-structural-v1":
+            raise ValueError("unsupported lexical scorer")
+        if self.bm25_k1 <= 0 or not 0 <= self.bm25_b <= 1:
+            raise ValueError("BM25 parameters are invalid")
+        if (
+            min(
+                self.heading_weight,
+                self.title_weight,
+                self.exact_identifier_bonus,
+                self.phrase_bonus,
+            )
+            < 0
+        ):
+            raise ValueError("lexical weights and bonuses cannot be negative")
         if (
             min(
                 self.lexical_candidates,
@@ -127,7 +148,7 @@ class CandidateRegistry:
 _CHUNKERS = {
     "C0": ChunkerSpec(
         candidate_id="C0",
-        implementation_version="1",
+        implementation_version="2-shared-model-budget",
         target_tokens=350,
         max_tokens=350,
         overlap_tokens=60,
@@ -136,7 +157,7 @@ _CHUNKERS = {
     ),
     "C1": ChunkerSpec(
         candidate_id="C1",
-        implementation_version="1",
+        implementation_version="2-layout-and-shared-model-budget",
         target_tokens=350,
         max_tokens=500,
         overlap_tokens=60,
@@ -145,7 +166,7 @@ _CHUNKERS = {
     ),
     "C2": ChunkerSpec(
         candidate_id="C2",
-        implementation_version="1",
+        implementation_version="2-layout-and-shared-model-budget",
         target_tokens=350,
         max_tokens=500,
         overlap_tokens=60,
@@ -168,7 +189,7 @@ _EMBEDDINGS = {
         query_prefix="Represent this sentence for searching relevant passages: ",
         document_prefix="",
         license="MIT",
-        truncation_policy="right",
+        truncation_policy="reject",
     ),
     "E1": EmbeddingSpec(
         candidate_id="E1",
@@ -183,7 +204,7 @@ _EMBEDDINGS = {
         query_prefix="Represent this sentence for searching relevant passages: ",
         document_prefix="",
         license="Apache-2.0",
-        truncation_policy="right",
+        truncation_policy="reject",
     ),
     "E2": EmbeddingSpec(
         candidate_id="E2",
@@ -198,7 +219,7 @@ _EMBEDDINGS = {
         query_prefix="",
         document_prefix="",
         license="Apache-2.0",
-        truncation_policy="right",
+        truncation_policy="reject",
     ),
 }
 
@@ -221,7 +242,7 @@ def build_profile(
     return ExperimentProfile(
         schema_version="rag-lab-profile-v1",
         profile_id=f"{chunker.candidate_id}+{embedding.candidate_id}",
-        parser_id="canonical-parser-v1",
+        parser_id="canonical-parser-v2-layout",
         chunker=chunker,
         embedding=embedding,
         retrieval=retrieval or RetrievalSpec(),

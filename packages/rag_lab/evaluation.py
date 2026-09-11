@@ -26,7 +26,13 @@ class QueryEvaluation:
     relevant_ranks: tuple[int, ...]
     dense_hit_at_5: bool
     lexical_hit_at_5: bool
+    evidence_spans_total: int
+    evidence_spans_hit_at_5: int
+    evidence_spans_hit_at_10: int
+    all_evidence_at_5: bool
+    all_evidence_at_10: bool
     citation_span_coverage: float
+    citation_span_coverage_at_10: float
     cross_workspace_results: int
     latency_ms: float
 
@@ -40,7 +46,12 @@ class QualityMetrics:
     ndcg_at_5: float
     dense_recall_at_5: float
     lexical_recall_at_5: float
+    evidence_span_recall_at_5: float
+    evidence_span_recall_at_10: float
+    complete_evidence_recall_at_5: float
+    complete_evidence_recall_at_10: float
     citation_span_coverage: float
+    citation_span_coverage_at_10: float
     citation_locator_resolution: float
     cross_workspace_results: int
     unanswerable_cases_with_results: int
@@ -158,6 +169,7 @@ class ExperimentRunner:
     def __init__(self, parser: CanonicalParser | None = None) -> None:
         self.parser = parser or CanonicalParser()
         self.tokenizer = RegexTokenizer()
+        self._document_cache: dict[str, CanonicalDocument] = {}
 
     def run(
         self,
@@ -179,13 +191,17 @@ class ExperimentRunner:
         indexing_started = time.perf_counter()
         for document_spec in dataset.documents:
             source = dataset.resolve_source(document_spec, corpus_root)
-            document = self.parser.parse(
-                source.read_bytes(),
-                document_id=str(document_spec.document_id),
-                version_id=str(document_spec.version_id),
-                title=document_spec.title,
-                media_type=document_spec.media_type,
-            )
+            version_id = str(document_spec.version_id)
+            document = self._document_cache.get(version_id)
+            if document is None:
+                document = self.parser.parse(
+                    source.read_bytes(),
+                    document_id=str(document_spec.document_id),
+                    version_id=version_id,
+                    title=document_spec.title,
+                    media_type=document_spec.media_type,
+                )
+                self._document_cache[version_id] = document
             documents[document.version_id] = document
             chunks = chunker.chunk(document)
             for chunk in chunks:
@@ -258,7 +274,7 @@ class ExperimentRunner:
             truncated_embedding_inputs=embedder.truncated_input_count,
         )
         return ExperimentReport(
-            report_schema="rag-lab-report-v1",
+            report_schema="rag-lab-report-v2",
             generated_at=datetime.now(UTC).isoformat(),
             profile=profile.as_dict(),
             profile_fingerprint=profile.fingerprint,
@@ -299,17 +315,40 @@ class ExperimentRunner:
         dense_hit = any(chunk_is_relevant(chunk, case.evidence) for chunk in trace.dense[:5])
         lexical_hit = any(chunk_is_relevant(chunk, case.evidence) for chunk in trace.lexical[:5])
         returned_chunks = tuple(result.chunk for result in trace.results)
+        hits_at_5 = sum(
+            self._evidence_is_retrieved(label, returned_chunks[:5]) for label in case.evidence
+        )
+        hits_at_10 = sum(
+            self._evidence_is_retrieved(label, returned_chunks[:10]) for label in case.evidence
+        )
+        evidence_total = len(case.evidence)
         return QueryEvaluation(
             case_id=case.case_id,
             returned_chunk_ids=tuple(chunk.chunk_id for chunk in returned_chunks),
             relevant_ranks=relevant_ranks,
             dense_hit_at_5=dense_hit,
             lexical_hit_at_5=lexical_hit,
-            citation_span_coverage=_citation_coverage(returned_chunks, case.evidence),
+            evidence_spans_total=evidence_total,
+            evidence_spans_hit_at_5=hits_at_5,
+            evidence_spans_hit_at_10=hits_at_10,
+            all_evidence_at_5=evidence_total > 0 and hits_at_5 == evidence_total,
+            all_evidence_at_10=evidence_total > 0 and hits_at_10 == evidence_total,
+            citation_span_coverage=_citation_coverage(returned_chunks[:5], case.evidence),
+            citation_span_coverage_at_10=_citation_coverage(returned_chunks[:10], case.evidence),
             cross_workspace_results=sum(
                 result.workspace_id != str(case.workspace_id) for result in trace.results
             ),
             latency_ms=latency_ms,
+        )
+
+    @staticmethod
+    def _evidence_is_retrieved(label: EvidenceSpan, chunks: tuple[Chunk, ...]) -> bool:
+        return any(
+            chunk.version_id == str(label.version_id)
+            and locator.block_id == label.block_id
+            and _overlap(locator.char_start, locator.char_end, label) > 0
+            for chunk in chunks
+            for locator in chunk.locators
         )
 
     def _aggregate_quality(
@@ -325,7 +364,9 @@ class ExperimentRunner:
         denominator = max(1, len(answerable))
         answerable_evaluations = [by_case[case.case_id] for case in answerable]
         recall_at_1 = sum(1 in result.relevant_ranks for result in answerable_evaluations)
-        recall_at_5 = sum(bool(result.relevant_ranks) for result in answerable_evaluations)
+        recall_at_5 = sum(
+            any(rank <= 5 for rank in result.relevant_ranks) for result in answerable_evaluations
+        )
         reciprocal_rank = sum(
             1.0 / min(result.relevant_ranks) if result.relevant_ranks else 0.0
             for result in answerable_evaluations
@@ -338,6 +379,8 @@ class ExperimentRunner:
                 for rank in range(1, len(evaluation.returned_chunk_ids) + 1)
             ]
             ndcg_total += _ndcg(relevant, len(case.evidence))
+        evidence_spans = sum(result.evidence_spans_total for result in answerable_evaluations)
+        evidence_denominator = max(1, evidence_spans)
         return QualityMetrics(
             evaluated_answerable_cases=len(answerable),
             recall_at_1=recall_at_1 / denominator,
@@ -348,8 +391,28 @@ class ExperimentRunner:
             / denominator,
             lexical_recall_at_5=sum(result.lexical_hit_at_5 for result in answerable_evaluations)
             / denominator,
+            evidence_span_recall_at_5=sum(
+                result.evidence_spans_hit_at_5 for result in answerable_evaluations
+            )
+            / evidence_denominator,
+            evidence_span_recall_at_10=sum(
+                result.evidence_spans_hit_at_10 for result in answerable_evaluations
+            )
+            / evidence_denominator,
+            complete_evidence_recall_at_5=sum(
+                result.all_evidence_at_5 for result in answerable_evaluations
+            )
+            / denominator,
+            complete_evidence_recall_at_10=sum(
+                result.all_evidence_at_10 for result in answerable_evaluations
+            )
+            / denominator,
             citation_span_coverage=sum(
                 result.citation_span_coverage for result in answerable_evaluations
+            )
+            / denominator,
+            citation_span_coverage_at_10=sum(
+                result.citation_span_coverage_at_10 for result in answerable_evaluations
             )
             / denominator,
             citation_locator_resolution=(

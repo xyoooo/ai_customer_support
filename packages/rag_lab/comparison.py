@@ -14,6 +14,8 @@ class ComparisonRow:
     mean_reciprocal_rank: float
     ndcg_at_5: float
     citation_span_coverage: float
+    complete_evidence_recall_at_5: float
+    complete_evidence_recall_at_10: float
     retrieval_p95_ms: float
     truncated_embedding_inputs: int
     wins: int
@@ -26,7 +28,7 @@ def _load_report(path: Path) -> dict[str, Any]:
         payload = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as exc:
         raise ValueError(f"experiment report could not be loaded: {path}") from exc
-    if payload.get("report_schema") != "rag-lab-report-v1":
+    if payload.get("report_schema") not in {"rag-lab-report-v1", "rag-lab-report-v2"}:
         raise ValueError(f"unsupported experiment report: {path}")
     return cast(dict[str, Any], payload)
 
@@ -74,6 +76,12 @@ def compare_reports(paths: list[Path]) -> tuple[ComparisonRow, ...]:
                 mean_reciprocal_rank=quality["mean_reciprocal_rank"],
                 ndcg_at_5=quality["ndcg_at_5"],
                 citation_span_coverage=quality["citation_span_coverage"],
+                complete_evidence_recall_at_5=quality.get(
+                    "complete_evidence_recall_at_5", quality["recall_at_5"]
+                ),
+                complete_evidence_recall_at_10=quality.get(
+                    "complete_evidence_recall_at_10", quality["recall_at_5"]
+                ),
                 retrieval_p95_ms=resources["retrieval_p95_ms"],
                 truncated_embedding_inputs=resources.get("truncated_embedding_inputs", 0),
                 wins=wins,
@@ -90,12 +98,15 @@ def render_markdown(rows: tuple[ComparisonRow, ...]) -> str:
         "",
         "This table is diagnostic evidence only; it does not select a winner automatically.",
         "",
-        "| Profile | Recall@5 | MRR | nDCG@5 | Citation coverage | p95 ms | "
+        "| Profile | Recall@5 | Complete@5 | Complete@10 | MRR | nDCG@5 | "
+        "Citation coverage | p95 ms | "
         "Truncated inputs | W/T/L vs control |",
-        "|---|---:|---:|---:|---:|---:|---:|---:|",
+        "|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|",
     ]
     lines.extend(
         f"| {row.profile_id} | {row.recall_at_5:.3f} | "
+        f"{row.complete_evidence_recall_at_5:.3f} | "
+        f"{row.complete_evidence_recall_at_10:.3f} | "
         f"{row.mean_reciprocal_rank:.3f} | {row.ndcg_at_5:.3f} | "
         f"{row.citation_span_coverage:.3f} | {row.retrieval_p95_ms:.2f} | "
         f"{row.truncated_embedding_inputs} | "

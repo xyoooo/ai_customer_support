@@ -2,13 +2,13 @@ from __future__ import annotations
 
 import json
 import math
-from collections import Counter
 from collections.abc import Sequence
 from typing import Any
 
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from packages.rag_lab.lexical import BM25LexicalScorer
 from packages.rag_lab.models import (
     Chunk,
     IndexedChunk,
@@ -17,7 +17,6 @@ from packages.rag_lab.models import (
     SourceLocator,
 )
 from packages.rag_lab.profiles import RetrievalSpec
-from packages.rag_lab.tokenizer import RegexTokenizer
 
 
 def _cosine_similarity(left: Sequence[float], right: Sequence[float]) -> float:
@@ -69,7 +68,7 @@ class InMemoryHybridIndex:
     def __init__(self, retrieval: RetrievalSpec) -> None:
         self.retrieval = retrieval
         self._records: dict[tuple[str, str, str], IndexedChunk] = {}
-        self._tokenizer = RegexTokenizer()
+        self._lexical = BM25LexicalScorer(retrieval)
 
     def replace_version(
         self,
@@ -151,16 +150,11 @@ class InMemoryHybridIndex:
         dense_scored.sort(key=lambda item: (-item[0], item[1].chunk_id))
         dense = [chunk for _, chunk in dense_scored[: self.retrieval.dense_candidates]]
 
-        query_terms = [token.text.casefold() for token in self._tokenizer.spans(query)]
-        lexical_scored: list[tuple[float, Chunk]] = []
-        for record in candidates:
-            terms = [token.text.casefold() for token in self._tokenizer.spans(record.chunk.text)]
-            counts = Counter(terms)
-            score = sum(counts[term] for term in query_terms) / math.sqrt(max(1, len(terms)))
-            if score > 0:
-                lexical_scored.append((score, record.chunk))
-        lexical_scored.sort(key=lambda item: (-item[0], item[1].chunk_id))
-        lexical = [chunk for _, chunk in lexical_scored[: self.retrieval.lexical_candidates]]
+        lexical = self._lexical.rank(
+            query,
+            [record.chunk for record in candidates],
+            limit=self.retrieval.lexical_candidates,
+        )
         results = _fuse_rankings(
             dense,
             lexical,
@@ -196,12 +190,13 @@ def _row_to_chunk(row: Any) -> Chunk:
         locators=tuple(SourceLocator(**locator) for locator in raw_locators),
         heading_path=tuple(raw_heading_path),
         page_number=mapping["page_number"],
+        document_title=mapping["document_title"],
     )
 
 
 _DENSE_QUERY = """
 SELECT chunk_id, document_id, version_id, chunk_order, original_text,
-       embedding_text, token_count, locators, heading_path, page_number
+       embedding_text, token_count, locators, heading_path, page_number, document_title
 FROM rag_lab_chunks
 WHERE workspace_id = CAST(:workspace_id AS uuid)
   AND profile_fingerprint = :profile_fingerprint
@@ -213,15 +208,12 @@ LIMIT :dense_limit
 
 _LEXICAL_QUERY = """
 SELECT chunk_id, document_id, version_id, chunk_order, original_text,
-       embedding_text, token_count, locators, heading_path, page_number
-FROM rag_lab_chunks,
-     plainto_tsquery(CAST(:lexical_config AS regconfig), :query) AS q
+       embedding_text, token_count, locators, heading_path, page_number, document_title
+FROM rag_lab_chunks
 WHERE workspace_id = CAST(:workspace_id AS uuid)
   AND profile_fingerprint = :profile_fingerprint
   AND active
-  AND search_vector @@ q
-ORDER BY ts_rank_cd(search_vector, q) DESC, chunk_id
-LIMIT :lexical_limit
+ORDER BY chunk_id
 """
 
 
@@ -230,6 +222,7 @@ class PostgresHybridIndex:
 
     def __init__(self, retrieval: RetrievalSpec) -> None:
         self.retrieval = retrieval
+        self._lexical = BM25LexicalScorer(retrieval)
 
     async def replace_version(
         self,
@@ -267,13 +260,14 @@ class PostgresHybridIndex:
             INSERT INTO rag_lab_chunks (
                 workspace_id, profile_fingerprint, chunk_id, document_id, version_id,
                 chunk_order, original_text, embedding_text, token_count, locators,
-                heading_path, page_number, embedding, embedding_dimension, active
+                heading_path, page_number, document_title, embedding,
+                embedding_dimension, active
             ) VALUES (
                 CAST(:workspace_id AS uuid), :profile_fingerprint, :chunk_id,
                 CAST(:document_id AS uuid), CAST(:version_id AS uuid), :chunk_order,
                 :original_text, :embedding_text, :token_count, CAST(:locators AS jsonb),
-                CAST(:heading_path AS jsonb), :page_number, CAST(:embedding AS vector),
-                :embedding_dimension, :active
+                CAST(:heading_path AS jsonb), :page_number, :document_title,
+                CAST(:embedding AS vector), :embedding_dimension, :active
             )
             """
         )
@@ -346,7 +340,11 @@ class PostgresHybridIndex:
             )
         ).all()
         dense = tuple(_row_to_chunk(row) for row in dense_rows)
-        lexical = tuple(_row_to_chunk(row) for row in lexical_rows)
+        lexical = self._lexical.rank(
+            query,
+            tuple(_row_to_chunk(row) for row in lexical_rows),
+            limit=self.retrieval.lexical_candidates,
+        )
         results = _fuse_rankings(
             dense,
             lexical,

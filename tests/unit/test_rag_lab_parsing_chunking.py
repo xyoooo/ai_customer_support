@@ -4,8 +4,9 @@ import pytest
 
 from packages.rag_lab.chunking import FixedTokenChunker, StructureAwareChunker
 from packages.rag_lab.models import BlockKind, CanonicalBlock, CanonicalDocument
-from packages.rag_lab.parsing import CanonicalParser
+from packages.rag_lab.parsing import CanonicalParser, _PdfLine
 from packages.rag_lab.profiles import ChunkerSpec
+from packages.rag_lab.token_budget import RegexInputBudget
 from packages.rag_lab.tokenizer import RegexTokenizer
 
 
@@ -77,6 +78,39 @@ def test_parser_rejects_empty_unknown_and_malformed_documents() -> None:
             title="",
             media_type="application/json",
         )
+
+
+def test_pdf_layout_helpers_preserve_columns_paragraphs_and_lists() -> None:
+    lines = [
+        _PdfLine("Section", 50, 66, 54, 150, 17, "SFPro-Medium"),
+        _PdfLine("left first", 100, 110, 54, 200, 9, "SFPro-Regular"),
+        _PdfLine("left second", 112, 122, 54, 200, 9, "SFPro-Regular"),
+        _PdfLine("right first", 100, 110, 343, 500, 9, "SFPro-Regular"),
+        _PdfLine("right second", 112, 122, 343, 500, 9, "SFPro-Regular"),
+    ]
+    ordered = CanonicalParser._reading_order(lines, 612)
+    assert [line.text for line in ordered] == [
+        "Section",
+        "left first",
+        "left second",
+        "right first",
+        "right second",
+    ]
+
+    paragraphs = CanonicalParser._pdf_paragraphs(
+        [
+            _PdfLine("Heading", 50, 64, 54, 160, 14, "SFPro-Medium"),
+            _PdfLine("A hyphen-", 80, 90, 54, 200, 9, "SFPro-Regular"),
+            _PdfLine("ated phrase.", 92, 102, 54, 200, 9, "SFPro-Regular"),
+            _PdfLine("• First item", 120, 130, 54, 200, 9, "SFPro-Regular"),
+            _PdfLine("continues here.", 132, 142, 68, 210, 9, "SFPro-Regular"),
+        ]
+    )
+    assert [paragraph.text for paragraph in paragraphs] == [
+        "Heading",
+        "A hyphenated phrase.",
+        "• First item continues here.",
+    ]
 
 
 def test_fixed_token_control_has_stable_overlap_and_no_duplicate_final_chunk() -> None:
@@ -157,3 +191,26 @@ def test_structure_chunker_uses_sentence_then_token_fallback_under_hard_limit() 
     source_tokens = {token.text for token in RegexTokenizer().spans(text)}
     chunk_tokens = {token.text for chunk in chunks for token in RegexTokenizer().spans(chunk.text)}
     assert source_tokens <= chunk_tokens
+
+
+def test_structure_candidates_share_boundaries_under_embedding_budget() -> None:
+    document = CanonicalParser().parse(
+        b"# Long section\nOne two three four five six seven eight nine ten eleven twelve.",
+        document_id="doc",
+        version_id="v1",
+        title="Budget",
+        media_type="text/markdown",
+    )
+    budget = RegexInputBudget(15)
+    c1 = StructureAwareChunker(_spec("C1", target=20, maximum=25, overlap=2), budget=budget).chunk(
+        document
+    )
+    c2 = StructureAwareChunker(_spec("C2", target=20, maximum=25, overlap=2), budget=budget).chunk(
+        document
+    )
+
+    assert [(chunk.text, chunk.locators) for chunk in c1] == [
+        (chunk.text, chunk.locators) for chunk in c2
+    ]
+    assert len(c1) > 1
+    assert all(budget.fits(chunk.embedding_text) for chunk in c2)

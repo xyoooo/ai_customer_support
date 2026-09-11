@@ -7,6 +7,7 @@ from typing import Protocol
 
 from packages.rag_lab.models import CanonicalBlock, CanonicalDocument, Chunk, SourceLocator
 from packages.rag_lab.profiles import CANDIDATES, ChunkerSpec
+from packages.rag_lab.token_budget import EmbeddingInputBudget, RegexInputBudget
 from packages.rag_lab.tokenizer import RegexTokenizer, TokenSpan
 
 _SENTENCE_PATTERN = re.compile(r"[^.!?]+(?:[.!?]+(?=\s|$)|$)", flags=re.DOTALL)
@@ -103,12 +104,7 @@ def _chunk_from_fragments(
     heading_path = _common_heading_path(merged)
     page_numbers = {fragment.block.page_number for fragment in merged}
     page_number = next(iter(page_numbers)) if len(page_numbers) == 1 else None
-    if contextual:
-        title = document.title or "[untitled]"
-        section = " > ".join(heading_path) or "[root]"
-        embedding_text = f"Document: {title}\nSection: {section}\n\n{text}"
-    else:
-        embedding_text = text
+    embedding_text = _embedding_text(document, text, heading_path) if contextual else text
     tokenizer = RegexTokenizer()
     return Chunk.create(
         document_id=document.document_id,
@@ -120,7 +116,24 @@ def _chunk_from_fragments(
         locators=tuple(fragment.locator for fragment in merged),
         heading_path=heading_path,
         page_number=page_number,
+        document_title=document.title,
     )
+
+
+def _embedding_text(
+    document: CanonicalDocument,
+    text: str,
+    heading_path: tuple[str, ...],
+) -> str:
+    title = document.title or "[untitled]"
+    section = " > ".join(heading_path) or "[root]"
+    return f"Document: {title}\nSection: {section}\n\n{text}"
+
+
+def _shared_budget_text(document: CanonicalDocument, fragments: list[_Fragment]) -> str:
+    merged = _merge_fragments(fragments)
+    text = "\n\n".join(fragment.text for fragment in merged)
+    return _embedding_text(document, text, _common_heading_path(merged))
 
 
 def _tail_overlap(fragments: list[_Fragment], limit: int) -> list[_Fragment]:
@@ -152,11 +165,17 @@ def _tail_overlap(fragments: list[_Fragment], limit: int) -> list[_Fragment]:
 
 
 class FixedTokenChunker:
-    def __init__(self, spec: ChunkerSpec) -> None:
+    def __init__(
+        self,
+        spec: ChunkerSpec,
+        *,
+        budget: EmbeddingInputBudget | None = None,
+    ) -> None:
         if spec.candidate_id != "C0":
             raise ValueError("FixedTokenChunker requires the C0 profile")
         self.spec = spec
         self.tokenizer = RegexTokenizer()
+        self.budget = budget or RegexInputBudget(10**9)
 
     def chunk(self, document: CanonicalDocument) -> tuple[Chunk, ...]:
         grouping = (
@@ -165,42 +184,56 @@ class FixedTokenChunker:
             else (lambda block: 0)
         )
         chunks: list[Chunk] = []
-        stride = self.spec.target_tokens - self.spec.overlap_tokens
         for _, block_group in groupby(document.blocks, key=grouping):
             token_references: list[tuple[CanonicalBlock, TokenSpan]] = []
             for block in block_group:
                 token_references.extend(
                     (block, token) for token in self.tokenizer.spans(block.text)
                 )
-            for start in range(0, len(token_references), stride):
-                window = token_references[start : start + self.spec.target_tokens]
+            start = 0
+            while start < len(token_references):
+                end = min(start + self.spec.target_tokens, len(token_references))
+                window = token_references[start:end]
                 if not window:
-                    continue
-                fragments: list[_Fragment] = []
-                for block, references in groupby(window, key=lambda item: item[0]):
-                    tokens = tuple(reference[1] for reference in references)
-                    fragments.append(_fragment_from_tokens(block, tokens))
-                chunks.append(
-                    _chunk_from_fragments(
+                    break
+                while window:
+                    fragments = []
+                    for block, references in groupby(window, key=lambda item: item[0]):
+                        tokens = tuple(reference[1] for reference in references)
+                        fragments.append(_fragment_from_tokens(block, tokens))
+                    candidate = _chunk_from_fragments(
                         document,
                         fragments,
                         order=len(chunks),
                         contextual=False,
                     )
-                )
-                if start + self.spec.target_tokens >= len(token_references):
+                    if self.budget.fits(candidate.embedding_text):
+                        break
+                    window = window[:-1]
+                    end -= 1
+                if not window:
+                    raise ValueError("one source token cannot fit the shared embedding budget")
+                chunks.append(candidate)
+                if end >= len(token_references):
                     break
+                start = max(start + 1, end - self.spec.overlap_tokens)
         if not chunks:
             raise ValueError("chunking produced no content")
         return tuple(chunks)
 
 
 class StructureAwareChunker:
-    def __init__(self, spec: ChunkerSpec) -> None:
+    def __init__(
+        self,
+        spec: ChunkerSpec,
+        *,
+        budget: EmbeddingInputBudget | None = None,
+    ) -> None:
         if spec.candidate_id not in {"C1", "C2"}:
             raise ValueError("StructureAwareChunker requires the C1 or C2 profile")
         self.spec = spec
         self.tokenizer = RegexTokenizer()
+        self.budget = budget or RegexInputBudget(10**9)
 
     def chunk(self, document: CanonicalDocument) -> tuple[Chunk, ...]:
         chunks: list[Chunk] = []
@@ -212,15 +245,15 @@ class StructureAwareChunker:
             pieces: list[_Fragment] = []
             for block in block_group:
                 pieces.extend(self._split_block(block))
-            for fragments in self._pack_section(pieces):
-                chunks.append(
-                    _chunk_from_fragments(
-                        document,
-                        fragments,
-                        order=len(chunks),
-                        contextual=self.spec.context_policy != "original",
-                    )
+            for fragments in self._pack_section(document, pieces):
+                chunk = _chunk_from_fragments(
+                    document,
+                    fragments,
+                    order=len(chunks),
+                    contextual=self.spec.context_policy != "original",
                 )
+                self.budget.assert_fits(_shared_budget_text(document, fragments))
+                chunks.append(chunk)
         if not chunks:
             raise ValueError("chunking produced no content")
         return tuple(chunks)
@@ -254,12 +287,62 @@ class StructureAwareChunker:
                 )
         return sentences
 
-    def _pack_section(self, pieces: list[_Fragment]) -> list[list[_Fragment]]:
+    def _fit_piece(
+        self,
+        document: CanonicalDocument,
+        piece: _Fragment,
+    ) -> list[_Fragment]:
+        if self.budget.fits(_shared_budget_text(document, [piece])):
+            return [piece]
+        tokens = self.tokenizer.spans(piece.text)
+        fitted: list[_Fragment] = []
+        start = 0
+        while start < len(tokens):
+            low = start + 1
+            high = len(tokens)
+            best = start
+            while low <= high:
+                middle = (low + high) // 2
+                fragment = _fragment_from_tokens(piece.block, tokens[start:middle])
+                fragment = _Fragment(
+                    block=fragment.block,
+                    char_start=piece.char_start + fragment.char_start,
+                    char_end=piece.char_start + fragment.char_end,
+                    token_count=fragment.token_count,
+                )
+                if self.budget.fits(_shared_budget_text(document, [fragment])):
+                    best = middle
+                    low = middle + 1
+                else:
+                    high = middle - 1
+            if best == start:
+                raise ValueError("one source token cannot fit the shared embedding budget")
+            fragment = _fragment_from_tokens(piece.block, tokens[start:best])
+            fitted.append(
+                _Fragment(
+                    block=fragment.block,
+                    char_start=piece.char_start + fragment.char_start,
+                    char_end=piece.char_start + fragment.char_end,
+                    token_count=fragment.token_count,
+                )
+            )
+            start = best
+        return fitted
+
+    def _pack_section(
+        self,
+        document: CanonicalDocument,
+        pieces: list[_Fragment],
+    ) -> list[list[_Fragment]]:
         packed: list[list[_Fragment]] = []
         current: list[_Fragment] = []
         current_tokens = 0
-        for piece in pieces:
-            if current and current_tokens + piece.token_count > self.spec.target_tokens:
+        fitted_pieces = [fitted for piece in pieces for fitted in self._fit_piece(document, piece)]
+        for piece in fitted_pieces:
+            proposed = [*current, piece]
+            exceeds_target = current_tokens + piece.token_count > self.spec.target_tokens
+            exceeds_budget = not self.budget.fits(_shared_budget_text(document, proposed))
+            if current and (exceeds_target or exceeds_budget):
                 packed.append(current)
                 overlap_limit = min(
                     self.spec.overlap_tokens,
@@ -267,6 +350,11 @@ class StructureAwareChunker:
                 )
                 current = _tail_overlap(current, overlap_limit)
                 current_tokens = sum(fragment.token_count for fragment in current)
+                while current and not self.budget.fits(
+                    _shared_budget_text(document, [*current, piece])
+                ):
+                    current = current[1:]
+                    current_tokens = sum(fragment.token_count for fragment in current)
             current.append(piece)
             current_tokens += piece.token_count
             if current_tokens > self.spec.max_tokens:
@@ -276,8 +364,12 @@ class StructureAwareChunker:
         return packed
 
 
-def build_chunker(candidate: str | ChunkerSpec) -> Chunker:
+def build_chunker(
+    candidate: str | ChunkerSpec,
+    *,
+    budget: EmbeddingInputBudget | None = None,
+) -> Chunker:
     spec = CANDIDATES.chunker(candidate) if isinstance(candidate, str) else candidate
     if spec.candidate_id == "C0":
-        return FixedTokenChunker(spec)
-    return StructureAwareChunker(spec)
+        return FixedTokenChunker(spec, budget=budget)
+    return StructureAwareChunker(spec, budget=budget)

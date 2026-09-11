@@ -145,6 +145,9 @@ def test_experiment_runner_reports_quality_resources_and_no_raw_content(tmp_path
 
     assert report.quality.evaluated_answerable_cases == 2
     assert report.quality.recall_at_5 == 1.0
+    assert report.quality.evidence_span_recall_at_5 == 1.0
+    assert report.quality.complete_evidence_recall_at_5 == 1.0
+    assert report.quality.complete_evidence_recall_at_10 == 1.0
     assert report.quality.cross_workspace_results == 0
     assert report.quality.citation_locator_resolution == 1.0
     assert report.resources.document_count == 2

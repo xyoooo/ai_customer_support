@@ -7,7 +7,8 @@ from packages.rag_lab.chunking import build_chunker
 from packages.rag_lab.dataset import EvaluationDataset
 from packages.rag_lab.embeddings import FastEmbedAdapter
 from packages.rag_lab.evaluation import ExperimentRunner
-from packages.rag_lab.profiles import CANDIDATES, build_profile
+from packages.rag_lab.profiles import CANDIDATES, RetrievalSpec, build_profile
+from packages.rag_lab.token_budget import SharedModelInputBudget
 
 
 def parse_args() -> argparse.Namespace:
@@ -21,6 +22,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--strict-dataset", action="store_true")
     parser.add_argument("--threads", type=int)
+    parser.add_argument("--result-count", type=int, default=5)
     return parser.parse_args()
 
 
@@ -34,8 +36,13 @@ def main() -> None:
         args.embedder,
         dataset_version=dataset.dataset_version,
         code_revision=args.code_revision,
+        retrieval=RetrievalSpec(result_count=args.result_count),
     )
-    chunker = build_chunker(profile.chunker)
+    budget = SharedModelInputBudget.from_model_root(
+        args.model_root,
+        tuple(CANDIDATES.embeddings.values()),
+    )
+    chunker = build_chunker(profile.chunker, budget=budget)
     embedder = FastEmbedAdapter(
         profile.embedding,
         model_path=args.model_root / profile.embedding.candidate_id,
